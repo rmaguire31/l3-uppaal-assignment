@@ -8,7 +8,7 @@ const int ADDR_WIDTH = 4;
 const int ADDR_MAX = (1 &lt;&lt; ADDR_WIDTH) - 1;
 
 // Global clock.
-clock time;</declaration><template><name x="5" y="5">Core</name><parameter>int[0,ADDR_MAX] &amp;addr, chan &amp;read, chan &amp;write, chan &amp;halt, urgent chan &amp;done</parameter><declaration>/** Core process template
+clock time;</declaration><template><name x="5" y="5">Core</name><parameter>int[0,ADDR_MAX] &amp;addr, chan &amp;read, chan &amp;write, urgent chan &amp;done</parameter><declaration>/** Core process template
  *
  * DESCRIPTION
  *    Template for process which generates randomly generates read and write requests
@@ -18,32 +18,30 @@ clock time;</declaration><template><name x="5" y="5">Core</name><parameter>int[0
  *    read  - channel signaling read request
  *    write - channel signaling write request
  *    done  - channel signaling completed request
- *    halt  - channel signaling transition to HALTING
  *
  * COPYRIGHT (c) 2018 Russell Maguire
- */</declaration><location id="id0" x="-504" y="-112"><name x="-488" y="-120">HALTING</name></location><location id="id1" x="-656" y="32"><name x="-640" y="24">WAITING</name></location><location id="id2" x="-656" y="-112"><name x="-672" y="-96">IDLE</name></location><location id="id3" x="-808" y="-112"><name x="-872" y="-120">START</name><committed/></location><init ref="id3"/><transition><source ref="id1"/><target ref="id3"/><label kind="synchronisation" x="-856" y="-40">done?</label><nail x="-808" y="32"/></transition><transition><source ref="id2"/><target ref="id0"/><label kind="synchronisation" x="-600" y="-128">halt!</label></transition><transition><source ref="id2"/><target ref="id1"/><label kind="synchronisation" x="-592" y="-72">read!</label><nail x="-584" y="-40"/></transition><transition><source ref="id2"/><target ref="id1"/><label kind="synchronisation" x="-760" y="-72">write!</label><nail x="-728" y="-40"/></transition><transition><source ref="id3"/><target ref="id2"/><label kind="select" x="-792" y="-144">a : int[0,ADDR_MAX]</label><label kind="assignment" x="-792" y="-128">addr = a</label></transition></template><template><name>MemController</name><parameter>urgent chan &amp;read, urgent chan &amp;write, urgent chan &amp;halt, chan &amp;done</parameter><declaration>// MemController declarations
+ */
+
+clock t;</declaration><location id="id0" x="-1000" y="-160"><name x="-1112" y="-168">ACCESS_END</name><committed/></location><location id="id1" x="-696" y="-160"><name x="-680" y="-168">ACCESS_START</name><committed/></location><location id="id2" x="-856" y="-160"><name x="-840" y="-168">WAITING</name></location><location id="id3" x="-1000" y="-24"><name x="-1048" y="-32">IDLE</name></location><init ref="id3"/><transition><source ref="id0"/><target ref="id3"/></transition><transition><source ref="id1"/><target ref="id2"/><label kind="synchronisation" x="-800" y="-120">write!</label><nail x="-776" y="-80"/></transition><transition><source ref="id1"/><target ref="id2"/><label kind="synchronisation" x="-800" y="-216">read!</label><nail x="-776" y="-240"/></transition><transition><source ref="id3"/><target ref="id1"/><label kind="select" x="-688" y="-104">rand : int[0,ADDR_MAX]</label><label kind="assignment" x="-688" y="-88">addr = rand, t = 0</label><nail x="-696" y="-24"/></transition><transition><source ref="id2"/><target ref="id0"/><label kind="synchronisation" x="-944" y="-176">done?</label></transition></template><template><name>MemController</name><parameter>urgent chan &amp;access, chan &amp;done</parameter><declaration>// MemController declarations
 // COPYRIGHT (c) 2018 Russell Maguire
 
-const int READ_TMIN = 25;
-const int WRITE_TMIN = 25;
-const int READ_TMAX = 30;
-const int WRITE_TMAX = 30;
+const int TMIN = 25;
+const int TMAX = 30;
 
-clock t;</declaration><location id="id4" x="288" y="0"><name x="280" y="-32">HALTING</name></location><location id="id5" x="144" y="144"><name x="160" y="128">WRITING</name><label kind="invariant" x="160" y="144">t &lt;= WRITE_TMAX</label></location><location id="id6" x="144" y="-144"><name x="160" y="-160">READING</name><label kind="invariant" x="160" y="-144">t &lt;= READ_TMAX</label></location><location id="id7" x="0" y="0"><name x="-48" y="-8">IDLE</name></location><init ref="id7"/><transition><source ref="id7"/><target ref="id5"/><label kind="synchronisation" x="152" y="56">write?</label><label kind="assignment" x="152" y="71">t = 0</label><nail x="144" y="0"/></transition><transition><source ref="id7"/><target ref="id6"/><label kind="synchronisation" x="152" y="-80">read?</label><label kind="assignment" x="152" y="-65">t = 0</label><nail x="144" y="0"/></transition><transition><source ref="id7"/><target ref="id4"/><label kind="synchronisation" x="192" y="-16">halt?</label><nail x="160" y="0"/></transition><transition><source ref="id5"/><target ref="id7"/><label kind="guard" x="8" y="112">t &gt;= WRITE_TMIN</label><label kind="synchronisation" x="8" y="127">done!</label><nail x="0" y="144"/></transition><transition><source ref="id6"/><target ref="id7"/><label kind="guard" x="8" y="-176">t &gt;= READ_TMIN</label><label kind="synchronisation" x="8" y="-161">done!</label><nail x="0" y="-144"/></transition></template><system>/** Main memory system
+clock t;</declaration><location id="id4" x="72" y="-144"><name x="88" y="-160">ACCESSING</name><label kind="invariant" x="88" y="-144">t &lt;= TMAX</label></location><location id="id5" x="-72" y="0"><name x="-120" y="-8">IDLE</name></location><init ref="id5"/><transition><source ref="id5"/><target ref="id4"/><label kind="synchronisation" x="80" y="-80">access?</label><label kind="assignment" x="80" y="-65">t = 0</label><nail x="72" y="0"/></transition><transition><source ref="id4"/><target ref="id5"/><label kind="guard" x="-64" y="-160">t &gt;= TMIN</label><label kind="synchronisation" x="-64" y="-176">done!</label><nail x="-72" y="-144"/></transition></template><system>/** Direct-mapped cache system
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
 // Address bus.
 int[0,ADDR_MAX] addr = 0;
 
-// Read and write operations.
-chan read;
-chan write;
-chan halt;
+// Channels
+chan access;
 chan done;
 
-// System processes.
-core = Core(addr, read, write, halt, done);
-mem_controller = MemController(read, write, halt, done);
+// System processes
+// core.read and core.write both use the same generic memory access channel
+core = Core(addr, access, access, done);
+mem_controller = MemController(access, done);
 
 system core, mem_controller;</system></nta>
