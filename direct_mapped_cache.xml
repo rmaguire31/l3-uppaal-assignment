@@ -1,26 +1,22 @@
-<?xml version="1.0" encoding="utf-8"?><!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_1.dtd'><nta><declaration>/** Global declarations
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<declaration>/** Global declarations
  *
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
 // Constants.
 const int ADDR_WIDTH = 4;
-const int SLOT_WIDTH = 1;
-const int TAG_WIDTH = ADDR_WIDTH - SLOT_WIDTH;
-
-const int ADDR_MAX = (1 &lt;&lt; ADDR_WIDTH) - 1;
-const int SLOT_MAX = (1 &lt;&lt; SLOT_WIDTH) - 1;
-const int SLOT_MASK = SLOT_MAX;
-const int TAG_MAX = (1 &lt;&lt; TAG_WIDTH) - 1;
-
-const int CACHE_INVALID = -1;
+const bool RW_READ = 0;
+const bool RW_WRITE = 1;
 
 // Global clock.
-clock time;
-
-// Global counters
-int hits = 0;
-int misses = 0;</declaration><template><name x="5" y="5">Core</name><parameter>int[0,ADDR_MAX] &amp;addr, chan &amp;read, chan &amp;write, urgent chan &amp;done</parameter><declaration>/** Core process template
+clock time;</declaration>
+	<template>
+		<name x="5" y="5">Core</name>
+		<parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;rw, chan &amp;request, urgent chan &amp;response</parameter>
+		<declaration>/** Core process template
  *
  * DESCRIPTION
  *    Template for process which generates randomly generates read and write requests
@@ -34,95 +30,116 @@ int misses = 0;</declaration><template><name x="5" y="5">Core</name><parameter>i
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
-clock t;</declaration><location id="id0" x="-1000" y="-160"><name x="-1112" y="-168">ACCESS_END</name><committed/></location><location id="id1" x="-696" y="-160"><name x="-680" y="-168">ACCESS_START</name><committed/></location><location id="id2" x="-856" y="-160"><name x="-840" y="-168">WAITING</name></location><location id="id3" x="-1000" y="-24"><name x="-1048" y="-32">IDLE</name></location><init ref="id3"/><transition><source ref="id0"/><target ref="id3"/></transition><transition><source ref="id1"/><target ref="id2"/><label kind="synchronisation" x="-800" y="-120">write!</label><nail x="-776" y="-80"/></transition><transition><source ref="id1"/><target ref="id2"/><label kind="synchronisation" x="-800" y="-216">read!</label><nail x="-776" y="-240"/></transition><transition><source ref="id3"/><target ref="id1"/><label kind="select" x="-688" y="-104">rand : int[0,ADDR_MAX]</label><label kind="assignment" x="-688" y="-88">addr = rand, t = 0</label><nail x="-696" y="-24"/></transition><transition><source ref="id2"/><target ref="id0"/><label kind="synchronisation" x="-944" y="-176">done?</label></transition></template><template><name>MemController</name><parameter>urgent chan &amp;access, chan &amp;done</parameter><declaration>/** Memory controller process template
- *
- * DESCRIPTION
- *    Template for process handles memory requests
- *
- * INPUTS
- *    addr   - address bus
- *    access - channel signaling main memory access request
- *    done   - channel signaling completed request
- *
- * COPYRIGHT (c) 2018 Russell Maguire
- */
+clock t;
+
+int i;</declaration>
+		<location id="id0" x="-714" y="-25">
+			<name x="-697" y="-34">CHOOSING_ADDR</name>
+			<committed/>
+		</location>
+		<location id="id1" x="-994" y="-161">
+			<name x="-1106" y="-169">ACCESS_END</name>
+			<committed/>
+		</location>
+		<location id="id2" x="-714" y="-161">
+			<name x="-698" y="-169">ACCESS_START</name>
+			<committed/>
+		</location>
+		<location id="id3" x="-858" y="-161">
+			<name x="-869" y="-145">WAITING</name>
+		</location>
+		<location id="id4" x="-994" y="-25">
+			<name x="-1042" y="-33">IDLE</name>
+		</location>
+		<init ref="id4"/>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id0"/>
+			<label kind="select" x="-824" y="59">rand : int[0,1]</label>
+			<label kind="assignment" x="-824" y="76">addr[i] = rand,
+i++</label>
+			<nail x="-714" y="51"/>
+			<nail x="-858" y="51"/>
+			<nail x="-858" y="-25"/>
+		</transition>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id0"/>
+			<label kind="assignment" x="-867" y="-51">i = 0</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id2"/>
+			<label kind="select" x="-705" y="-128">rand : int[0,1]</label>
+			<label kind="guard" x="-705" y="-76">i &gt;= ADDR_WIDTH</label>
+			<label kind="assignment" x="-705" y="-111">rw = rand</label>
+		</transition>
+		<transition>
+			<source ref="id1"/>
+			<target ref="id4"/>
+		</transition>
+		<transition>
+			<source ref="id2"/>
+			<target ref="id3"/>
+			<label kind="synchronisation" x="-807" y="-187">request!</label>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id1"/>
+			<label kind="synchronisation" x="-952" y="-187">response?</label>
+		</transition>
+	</template>
+	<template>
+		<name>Memory</name>
+		<parameter>urgent chan &amp;request, chan &amp;response</parameter>
+		<declaration>// MemController declarations
+// COPYRIGHT (c) 2018 Russell Maguire
 
 const int TMIN = 25;
 const int TMAX = 30;
 
-clock t;</declaration><location id="id4" x="72" y="-144"><name x="88" y="-160">ACCESSING</name><label kind="invariant" x="88" y="-144">t &lt;= TMAX</label></location><location id="id5" x="-72" y="0"><name x="-120" y="-8">IDLE</name></location><init ref="id5"/><transition><source ref="id5"/><target ref="id4"/><label kind="synchronisation" x="80" y="-80">access?</label><label kind="assignment" x="80" y="-65">t = 0</label><nail x="72" y="0"/></transition><transition><source ref="id4"/><target ref="id5"/><label kind="guard" x="-64" y="-160">t &gt;= TMIN</label><label kind="synchronisation" x="-64" y="-176">done!</label><nail x="-72" y="-144"/></transition></template><template><name>CacheLine</name><parameter>const int[0,SLOT_MAX] id, int[0,ADDR_MAX] &amp;addr, chan &amp;read_mem, chan &amp;write_mem, urgent chan &amp;mem_done, urgent chan &amp;read, urgent chan &amp;write, chan &amp;done</parameter><declaration>/** Memory controller process template
- *
- * DESCRIPTION
- *    Template for process handles memory requests
- *
- * INPUTS
- *    
- *    id     - ID for this cache line
- *    addr   - address bus
- *    read   - channel signaling read request
- *    write  - channel signaling write request
- *    access - channel signaling main memory access request
- *    done   - channel signaling completed request
- *
- * COPYRIGHT (c) 2018 Russell Maguire
- */
-
-
-const int TMINR = 5;
-const int TMAXR = 10;
-const int TMINW = 25;
-const int TMAXW = 30;
-
-clock t;
-
-int[CACHE_INVALID,TAG_MAX] tag = CACHE_INVALID;
-
-bool is_cache_line()
-{
-    int[0,SLOT_MAX] addr_slot = addr &amp; SLOT_MASK;
-    return (addr_slot == id);
-}
-
-bool is_cache_hit()
-{
-    int[0,TAG_MAX] addr_tag = addr &gt;&gt; SLOT_WIDTH;
-    return (addr_tag == tag);
-}
-
-void write_cache_line()
-{
-    int[0,TAG_MAX] addr_tag = addr &gt;&gt; SLOT_WIDTH;
-    tag = addr_tag;
-}
-
-void update_tracker()
-{
-    if (is_cache_hit())
-    {
-        hits++;
-    }
-    else
-    {
-        misses++;
-    }
-}</declaration><location id="id6" x="-7480" y="-15248"><name x="-7464" y="-15264">WRITING_CACHE</name><label kind="invariant" x="-7464" y="-15248">t &lt;= TMAXW</label></location><location id="id7" x="-7320" y="-15248"><name x="-7304" y="-15264">WRITING_CACHE1</name><label kind="invariant" x="-7304" y="-15248">t &lt;= TMAXW</label></location><location id="id8" x="-7160" y="-15112"><name x="-7170" y="-15142">WRITE_START1</name><committed/></location><location id="id9" x="-7160" y="-15248"><name x="-7168" y="-15232">ACCESS_END</name><committed/></location><location id="id10" x="-7160" y="-15392"><name x="-7296" y="-15408">READING_CACHE</name><label kind="invariant" x="-7296" y="-15392">t &lt;= TMAXR</label></location><location id="id11" x="-6856" y="-15112"><name x="-6840" y="-15120">WRITE_START</name><committed/></location><location id="id12" x="-6856" y="-15392"><name x="-6840" y="-15400">READ_START</name><committed/></location><location id="id13" x="-7008" y="-15248"><name x="-7016" y="-15232">IDLE</name></location><init ref="id13"/><transition><source ref="id7"/><target ref="id9"/><label kind="synchronisation" x="-7280" y="-15344">mem_done?</label><nail x="-7240" y="-15328"/></transition><transition><source ref="id6"/><target ref="id7"/><label kind="guard" x="-7456" y="-15168">t &gt;= TMINW</label><label kind="assignment" x="-7456" y="-15152">write_cache_line()</label><nail x="-7400" y="-15168"/></transition><transition><source ref="id6"/><target ref="id7"/><label kind="synchronisation" x="-7440" y="-15344">mem_done?</label><nail x="-7400" y="-15328"/></transition><transition><source ref="id8"/><target ref="id6"/><label kind="synchronisation" x="-7360" y="-15112">write_mem!</label><nail x="-7480" y="-15112"/></transition><transition><source ref="id11"/><target ref="id8"/><label kind="guard" x="-7048" y="-15144">is_cache_hit()</label><label kind="assignment" x="-7048" y="-15128">hits++</label></transition><transition><source ref="id7"/><target ref="id9"/><label kind="guard" x="-7296" y="-15168">t &gt;= TMINW</label><label kind="assignment" x="-7296" y="-15152">write_cache_line()</label><nail x="-7240" y="-15168"/></transition><transition><source ref="id11"/><target ref="id8"/><label kind="guard" x="-7048" y="-15096">!is_cache_hit()</label><label kind="assignment" x="-7048" y="-15080">misses++</label><nail x="-6856" y="-15064"/><nail x="-7160" y="-15064"/></transition><transition><source ref="id9"/><target ref="id13"/><label kind="synchronisation" x="-7144" y="-15272">done!</label></transition><transition><source ref="id12"/><target ref="id6"/><label kind="guard" x="-7048" y="-15488">!is_cache_hit()</label><label kind="synchronisation" x="-7048" y="-15472">read_mem!</label><label kind="assignment" x="-7048" y="-15456">misses++</label><nail x="-6856" y="-15440"/><nail x="-7480" y="-15440"/></transition><transition><source ref="id10"/><target ref="id9"/><label kind="guard" x="-7152" y="-15336">t &gt;= TMINR</label></transition><transition><source ref="id12"/><target ref="id10"/><label kind="guard" x="-7048" y="-15424">is_cache_hit()</label><label kind="assignment" x="-7048" y="-15408">hits++</label></transition><transition><source ref="id13"/><target ref="id11"/><label kind="guard" x="-6848" y="-15200">is_cache_line()</label><label kind="synchronisation" x="-6848" y="-15184">write?</label><nail x="-6856" y="-15248"/></transition><transition><source ref="id13"/><target ref="id12"/><label kind="guard" x="-6848" y="-15328">is_cache_line()</label><label kind="synchronisation" x="-6848" y="-15312">read?</label><nail x="-6856" y="-15248"/></transition></template><system>/** Main memory system
+clock t;</declaration>
+		<location id="id5" x="72" y="-144">
+			<name x="88" y="-160">ACCESSING</name>
+			<label kind="invariant" x="88" y="-144">t &lt;= TMAX</label>
+		</location>
+		<location id="id6" x="-72" y="0">
+			<name x="-120" y="-8">IDLE</name>
+		</location>
+		<init ref="id6"/>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id5"/>
+			<label kind="synchronisation" x="80" y="-80">request?</label>
+			<label kind="assignment" x="80" y="-65">t = 0</label>
+			<nail x="72" y="0"/>
+		</transition>
+		<transition>
+			<source ref="id5"/>
+			<target ref="id6"/>
+			<label kind="guard" x="-59" y="-171">t &gt;= TMIN</label>
+			<label kind="synchronisation" x="-59" y="-187">response!</label>
+			<nail x="-72" y="-144"/>
+		</transition>
+	</template>
+	<system>/** Main memory system
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
 // Address bus.
-int[0,ADDR_MAX] addr = 0;
+bool addr[ADDR_WIDTH];
+bool rw;
 
 // Channels
-chan read_cache;
-chan write_cache;
-chan cache_done;
-chan access_mem;
-chan mem_done;
+chan request;
+chan response;
 
 // System processes
 // core.read and core.write both use the same generic memory access channel
-core = Core(addr, read_cache, write_cache, cache_done);
-mem_controller = MemController(access_mem, mem_done);
-cache(const int[0,SLOT_MAX] id) = CacheLine(SLOT_MAX, addr, access_mem, access_mem, mem_done, read_cache, write_cache, cache_done);
+core = Core(addr, rw, req, res);
+memory = Memory(req, res);
 
-system core, cache, mem_controller;</system></nta>
+system core, memory;</system>
+	<queries>
+	</queries>
+</nta>
