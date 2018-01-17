@@ -3,14 +3,9 @@
 /*
 
 */
+E<>cache_counter.hit_rate_ge(90)
+
+/*
+
+*/
 core.ACCESS_START --> core.ACCESS_END
-
-/*
-
-*/
-core.ACCESS_END --> core.t >= 25
-
-/*
-
-*/
-core.ACCESS_END --> core.t <= 30

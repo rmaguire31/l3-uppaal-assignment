@@ -8,9 +8,9 @@ core.ACCESS_START --> core.ACCESS_END
 /*
 
 */
-core.ACCESS_END --> core.t >= 25
+core.ACCESS_START --> (core.ACCESS_END and core.t >= 25)
 
 /*
 
 */
-core.ACCESS_END --> core.t <= 30
+core.ACCESS_START --> (core.ACCESS_END and core.t <= 30)

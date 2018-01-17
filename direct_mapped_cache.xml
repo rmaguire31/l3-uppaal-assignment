@@ -1,145 +1,209 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
-<nta>
-	<declaration>/** Global declarations
+<?xml version="1.0" encoding="utf-8"?><!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_1.dtd'><nta><declaration>/** Global declarations
  *
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
 // Constants.
+const bool TRUE = 1;
+const bool FALSE = 0;
+
 const int ADDR_WIDTH = 4;
-const bool RW_READ = 0;
-const bool RW_WRITE = 1;
+const int LINE_WIDTH = 1;
+const int TAG_WIDTH = ADDR_WIDTH - LINE_WIDTH;
+
+const int LINE_OFFSET = 0;
+const int TAG_OFFSET = LINE_OFFSET + LINE_WIDTH;
+
+const int ADDR_MAX = (1 &lt;&lt; ADDR_WIDTH) - 1;
+const int LINE_MAX = (1 &lt;&lt; LINE_WIDTH) - 1;
+
+const bool READ = TRUE;
+const bool WRITE = FALSE;
 
 // Global clock.
-clock time;</declaration>
-	<template>
-		<name x="5" y="5">Core</name>
-		<parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;rw, chan &amp;request, urgent chan &amp;response</parameter>
-		<declaration>/** Core process template
+clock time;</declaration><template><name x="5" y="5">Core</name><parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;readwrite, chan &amp;request, urgent chan &amp;response</parameter><declaration>/** Core process template
  *
  * DESCRIPTION
  *    Template for process which generates randomly generates read and write requests
  *
  * INPUTS
- *    addr  - address bus
- *    read  - channel signaling read request
- *    write - channel signaling write request
- *    done  - channel signaling completed request
+ *    addr     - address bus array of boolean values
+ *    rw       - flag indicicating RW_WRITE or RW_READ
+ *    request  - channel signaling memory request
+ *    response - channel signaling memory response
  *
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
 clock t;
 
-int i;</declaration>
-		<location id="id0" x="-714" y="-25">
-			<name x="-697" y="-34">CHOOSING_ADDR</name>
-			<committed/>
-		</location>
-		<location id="id1" x="-994" y="-161">
-			<name x="-1106" y="-169">ACCESS_END</name>
-			<committed/>
-		</location>
-		<location id="id2" x="-714" y="-161">
-			<name x="-698" y="-169">ACCESS_START</name>
-			<committed/>
-		</location>
-		<location id="id3" x="-858" y="-161">
-			<name x="-869" y="-145">WAITING</name>
-		</location>
-		<location id="id4" x="-994" y="-25">
-			<name x="-1042" y="-33">IDLE</name>
-		</location>
-		<init ref="id4"/>
-		<transition>
-			<source ref="id0"/>
-			<target ref="id0"/>
-			<label kind="select" x="-824" y="59">rand : int[0,1]</label>
-			<label kind="assignment" x="-824" y="76">addr[i] = rand,
-i++</label>
-			<nail x="-714" y="51"/>
-			<nail x="-858" y="51"/>
-			<nail x="-858" y="-25"/>
-		</transition>
-		<transition>
-			<source ref="id4"/>
-			<target ref="id0"/>
-			<label kind="assignment" x="-867" y="-51">i = 0</label>
-		</transition>
-		<transition>
-			<source ref="id0"/>
-			<target ref="id2"/>
-			<label kind="select" x="-705" y="-128">rand : int[0,1]</label>
-			<label kind="guard" x="-705" y="-76">i &gt;= ADDR_WIDTH</label>
-			<label kind="assignment" x="-705" y="-111">rw = rand</label>
-		</transition>
-		<transition>
-			<source ref="id1"/>
-			<target ref="id4"/>
-		</transition>
-		<transition>
-			<source ref="id2"/>
-			<target ref="id3"/>
-			<label kind="synchronisation" x="-807" y="-187">request!</label>
-		</transition>
-		<transition>
-			<source ref="id3"/>
-			<target ref="id1"/>
-			<label kind="synchronisation" x="-952" y="-187">response?</label>
-		</transition>
-	</template>
-	<template>
-		<name>Memory</name>
-		<parameter>urgent chan &amp;request, chan &amp;response</parameter>
-		<declaration>// MemController declarations
+void update_addr(const int[0,ADDR_MAX] value)
+{
+    int i;
+    for (i = 0; i &lt; ADDR_WIDTH; i++)
+    {
+        addr[i] = (value &gt;&gt; i) &amp; 1;
+    }
+}
+
+void update_readwrite(const bool value)
+{
+    readwrite = value;
+}</declaration><location id="id0" x="-992" y="-160"><name x="-1104" y="-168">ACCESS_END</name><committed/></location><location id="id1" x="-712" y="-160"><name x="-696" y="-168">ACCESS_START</name><committed/></location><location id="id2" x="-856" y="-160"><name x="-882" y="-143">WAITING</name></location><location id="id3" x="-992" y="-24"><name x="-1040" y="-32">IDLE</name></location><init ref="id3"/><transition><source ref="id3"/><target ref="id1"/><label kind="select" x="-968" y="-56">rand0 : int[0,ADDR_MAX],
+rand1 : int[0,1]</label><label kind="assignment" x="-968" y="-24">update_addr(rand0),
+update_readwrite(rand1)</label><nail x="-712" y="-24"/></transition><transition><source ref="id0"/><target ref="id3"/></transition><transition><source ref="id1"/><target ref="id2"/><label kind="synchronisation" x="-807" y="-187">request!</label><label kind="assignment" x="-807" y="-161">t = 0</label></transition><transition><source ref="id2"/><target ref="id0"/><label kind="synchronisation" x="-950" y="-186">response?</label></transition></template><template><name>Memory</name><parameter>urgent chan &amp;request, chan &amp;response</parameter><declaration>// MemController declarations
 // COPYRIGHT (c) 2018 Russell Maguire
 
 const int TMIN = 25;
 const int TMAX = 30;
 
-clock t;</declaration>
-		<location id="id5" x="72" y="-144">
-			<name x="88" y="-160">ACCESSING</name>
-			<label kind="invariant" x="88" y="-144">t &lt;= TMAX</label>
-		</location>
-		<location id="id6" x="-72" y="0">
-			<name x="-120" y="-8">IDLE</name>
-		</location>
-		<init ref="id6"/>
-		<transition>
-			<source ref="id6"/>
-			<target ref="id5"/>
-			<label kind="synchronisation" x="80" y="-80">request?</label>
-			<label kind="assignment" x="80" y="-65">t = 0</label>
-			<nail x="72" y="0"/>
-		</transition>
-		<transition>
-			<source ref="id5"/>
-			<target ref="id6"/>
-			<label kind="guard" x="-59" y="-171">t &gt;= TMIN</label>
-			<label kind="synchronisation" x="-59" y="-187">response!</label>
-			<nail x="-72" y="-144"/>
-		</transition>
-	</template>
-	<system>/** Main memory system
+clock t;</declaration><location id="id4" x="72" y="-144"><name x="88" y="-160">ACCESSING</name><label kind="invariant" x="88" y="-144">t &lt;= TMAX</label></location><location id="id5" x="-72" y="0"><name x="-120" y="-8">IDLE</name></location><init ref="id5"/><transition><source ref="id5"/><target ref="id4"/><label kind="synchronisation" x="80" y="-80">request?</label><label kind="assignment" x="80" y="-65">t = 0</label><nail x="72" y="0"/></transition><transition><source ref="id4"/><target ref="id5"/><label kind="guard" x="-59" y="-171">t &gt;= TMIN</label><label kind="synchronisation" x="-59" y="-187">response!</label><nail x="-72" y="-144"/></transition></template><template><name>CacheLine</name><parameter>const int id, bool &amp;addr[ADDR_WIDTH], bool &amp;readwrite, urgent chan &amp;cache_request, chan &amp;cache_response, chan &amp;memory_request, urgent chan &amp;memory_response, broadcast chan &amp;cache_hit, broadcast chan &amp;cache_miss</parameter><declaration>/**
+ */
+
+const int TMINR = 5;
+const int TMAXR = 10;
+const int TMINW = 25;
+const int TMAXW = 30;
+
+bool line[LINE_WIDTH];
+bool tag[TAG_WIDTH];
+bool valid = FALSE;
+
+// Local clock for timed cache accesses.
+clock t;
+
+void init_cache_line()
+{
+    int i;
+    for (i = 0; i &lt; LINE_WIDTH; i++)
+    {
+        line[i] = (id &gt;&gt; i) &amp; 1;
+    }
+}
+
+/** Process-local check for cache line.
+ */
+bool is_cache_line()
+{
+    // Cache line if all line bits match.
+    int i;
+    for (i = 0; i &lt; LINE_WIDTH; i++)
+    {
+        if (addr[LINE_OFFSET+i] != line[i])
+        {
+            // Shortcut operation.
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+/** Process-local check for cache hit.
+ */
+bool is_cache_hit()
+{
+    // Only a cache hit if cache line is valid.
+    if (valid)
+    {
+        // Cache hit if all tag bits match.
+        int i;
+        for (i = 0; i &lt; TAG_WIDTH; i++)
+        {
+            if (addr[TAG_OFFSET+i] != tag[i])
+            {
+                // Shortcut operation.
+                return FALSE;
+            }
+        }
+    }
+    return valid;
+}
+
+/** Process-local procedure to update cache tag and valid bits.
+ */
+void update_cache_line()
+{
+    // Only model tag, don't bother writing data.
+    int i;
+    for (i = 0; i &lt; TAG_WIDTH; i++)
+    {
+        tag[i] = addr[TAG_OFFSET+i];
+    }
+
+    // Set cache valid bit.
+    valid = TRUE;
+}</declaration><location id="id6" x="8" y="0"><committed/></location><location id="id7" x="320" y="0"><name x="328" y="-24">WRITE_START</name><committed/></location><location id="id8" x="832" y="0"><name x="848" y="-8">WRITE_END</name><committed/></location><location id="id9" x="656" y="72"><name x="648" y="24">WRITING_CACHE</name><label kind="invariant" x="648" y="40">t &lt;= TMAXW</label></location><location id="id10" x="656" y="-72"><name x="648" y="-56">WRITING_MEMORY</name></location><location id="id11" x="488" y="-144"><name x="480" y="-192">READING_CACHE</name><label kind="invariant" x="480" y="-176">t &lt;= TMAXR</label></location><location id="id12" x="488" y="144"><name x="480" y="160">READING_MEMORY</name></location><location id="id13" x="488" y="0"><name x="504" y="-16">WRITING</name><label kind="invariant" x="504" y="0">t &lt;= TMAXW</label></location><location id="id14" x="320" y="-144"><name x="312" y="-176">HIT_START</name><committed/></location><location id="id15" x="320" y="144"><name x="312" y="160">MISS_START</name><committed/></location><location id="id16" x="160" y="0"><name x="176" y="-8">ACCESS_START</name><committed/></location><location id="id17" x="-144" y="0"><name x="-192" y="-8">IDLE</name></location><init ref="id17"/><transition><source ref="id6"/><target ref="id17"/><label kind="guard" x="-128" y="-96">!is_cache_line()</label><nail x="8" y="-72"/><nail x="-144" y="-72"/></transition><transition><source ref="id6"/><target ref="id16"/><label kind="guard" x="24" y="-24">is_cache_line()</label></transition><transition><source ref="id7"/><target ref="id13"/><label kind="synchronisation" x="336" y="8">memory_request!</label></transition><transition><source ref="id15"/><target ref="id7"/></transition><transition><source ref="id14"/><target ref="id7"/></transition><transition><source ref="id11"/><target ref="id8"/><label kind="guard" x="616" y="-168">t &gt;= TMINR</label><nail x="832" y="-144"/></transition><transition><source ref="id8"/><target ref="id17"/><label kind="synchronisation" x="840" y="88">cache_response!</label><label kind="assignment" x="840" y="104">update_cache_line()</label><nail x="832" y="216"/><nail x="-144" y="216"/></transition><transition><source ref="id12"/><target ref="id9"/><label kind="synchronisation" x="504" y="104">memory_response?</label><label kind="assignment" x="504" y="120">t = 0</label><nail x="656" y="144"/></transition><transition><source ref="id9"/><target ref="id8"/><label kind="guard" x="680" y="80">t &gt;= TMINW</label><nail x="768" y="72"/></transition><transition><source ref="id10"/><target ref="id8"/><label kind="synchronisation" x="672" y="-96">memory_response?</label><nail x="768" y="-72"/></transition><transition><source ref="id13"/><target ref="id9"/><label kind="synchronisation" x="504" y="48">memory_response?</label><nail x="488" y="72"/></transition><transition><source ref="id13"/><target ref="id10"/><label kind="guard" x="504" y="-96">t &gt;= TMINW</label><nail x="488" y="-72"/></transition><transition><source ref="id14"/><target ref="id11"/><label kind="guard" x="336" y="-136">readwrite == READ</label></transition><transition><source ref="id15"/><target ref="id12"/><label kind="guard" x="336" y="104">readwrite == READ</label><label kind="synchronisation" x="336" y="120">memory_request!</label></transition><transition><source ref="id16"/><target ref="id15"/><label kind="guard" x="176" y="104">!is_cache_hit()</label><label kind="synchronisation" x="176" y="120">cache_miss!</label><nail x="160" y="144"/></transition><transition><source ref="id16"/><target ref="id14"/><label kind="guard" x="176" y="-184">is_cache_hit()</label><label kind="synchronisation" x="176" y="-168">cache_hit!</label><nail x="160" y="-144"/></transition><transition><source ref="id17"/><target ref="id6"/><label kind="synchronisation" x="-128" y="8">cache_request?</label><label kind="assignment" x="-128" y="24">t = 0</label></transition></template><template><name>CacheCounter</name><parameter>urgent chan &amp;cache_hit, urgent chan &amp;cache_miss</parameter><declaration>/**
+ */
+
+int cache_hits = 0;
+int cache_misses = 0;
+
+/** Less than
+ */
+bool hit_rate_lt(const int hit_rate)
+{
+    return cache_hits + cache_misses &gt; 0
+        &amp;&amp; (100 - hit_rate) * cache_hits &lt; hit_rate * cache_misses;
+}
+
+/** Less than or equal to
+ */
+bool hit_rate_le(const int hit_rate)
+{
+    return cache_hits + cache_misses &gt; 0
+        &amp;&amp; (100 - hit_rate) * cache_hits &lt;= hit_rate * cache_misses;
+}
+
+/** Equal to
+ */
+bool hit_rate_eq(const int hit_rate)
+{
+    return cache_hits + cache_misses &gt; 0
+        &amp;&amp; (100 - hit_rate) * cache_hits == hit_rate * cache_misses;
+}
+
+/** Greater than or equal to
+ */
+bool hit_rate_ge(const int hit_rate)
+{
+    return cache_hits + cache_misses &gt; 0
+        &amp;&amp; (100 - hit_rate) * cache_hits &gt;= hit_rate * cache_misses;
+}
+
+/** Greater than or equal to
+ */
+bool hit_rate_gt(const int hit_rate)
+{
+    return cache_hits + cache_misses &gt; 0
+        &amp;&amp; (100 - hit_rate) * cache_hits &gt; hit_rate * cache_misses;
+}
+
+/** Not equal to
+ */
+bool hit_rate_ne(const int hit_rate)
+{
+    return cache_hits + cache_misses &gt; 0
+        &amp;&amp; (100 - hit_rate) * cache_hits != hit_rate * cache_misses;
+}</declaration><location id="id18" x="0" y="0"><name x="16" y="-8">IDLE</name></location><init ref="id18"/><transition><source ref="id18"/><target ref="id18"/><label kind="synchronisation" x="-48" y="88">cache_miss?</label><label kind="assignment" x="-48" y="104">cache_misses++</label><nail x="72" y="80"/><nail x="-72" y="80"/></transition><transition><source ref="id18"/><target ref="id18"/><label kind="synchronisation" x="-48" y="-120">cache_hit?</label><label kind="assignment" x="-48" y="-104">cache_hits++</label><nail x="72" y="-80"/><nail x="-72" y="-80"/></transition></template><system>/** Main memory system
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
 // Address bus.
 bool addr[ADDR_WIDTH];
-bool rw;
+bool readwrite;
 
 // Channels
-chan request;
-chan response;
+chan cache_hit;
+chan cache_miss;
+chan cache_request;
+chan cache_response;
+chan memory_request;
+chan memory_response;
 
 // System processes
-// core.read and core.write both use the same generic memory access channel
-core = Core(addr, rw, req, res);
-memory = Memory(req, res);
+core = Core(addr, readwrite, cache_request, cache_response);
+memory = Memory(memory_request, memory_response);
+cache_line(int[0,LINE_MAX] id) = CacheLine(LINE_MAX, addr, readwrite, cache_request, cache_response, memory_request, memory_response, cache_hit, cache_miss);
+cache_counter = CacheCounter(cache_hit, cache_miss);
 
-system core, memory;</system>
-	<queries>
-	</queries>
-</nta>
+system core, memory, cache_line, cache_counter;</system></nta>
