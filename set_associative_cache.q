@@ -3,7 +3,7 @@
 /*
 
 */
-E<>cache_counter.hit_rate_ge(90)
+E<>sa_cache_counter.hit_rate_ge(90)
 
 /*
 
