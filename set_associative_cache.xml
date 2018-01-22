@@ -504,7 +504,7 @@ sa_cache_line(const int[0,LINE_MAX] id) = cache_line(2, id);
 system core, synchroniser, dm_cache_line, sa_cache_line, memory, cache_counter;</system>
 	<queries>
 		<query>
-			<formula>E&lt;&gt;synchroniser.END and (cache_counter(2).cache_hits &gt; cache_counter(1).cache_hits)
+			<formula>E&lt;&gt;synchroniser.END and (cache_counter(2).cache_hits &gt; cache_counter(1).cache_hits) and (cache_counter(2).cache_misses &lt; cache_counter(1).cache_misses)
 			</formula>
 			<comment>
 			</comment>
