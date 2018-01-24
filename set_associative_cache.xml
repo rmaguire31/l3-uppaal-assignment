@@ -8,20 +8,13 @@
 
 // Bus specification.
 const int ADDR_WIDTH = 4;
-const int ADDR_MAX = (1 &lt;&lt; ADDR_WIDTH) - 1;
-
-const int LINE_WIDTH = 1;
-const int TAG_WIDTH = ADDR_WIDTH - LINE_WIDTH;
-
-const int LINE_OFFSET = 0;
-const int TAG_OFFSET = LINE_OFFSET + LINE_WIDTH;
-const int LINE_MAX = (1 &lt;&lt; LINE_WIDTH) - 1;
+const int MAX_LINE_WIDTH = 1;
 
 const bool READ = true;
 const bool WRITE = false;</declaration>
 	<template>
 		<name x="5" y="5">Core</name>
-		<parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;readwrite, broadcast chan &amp;request, urgent chan &amp;response</parameter>
+		<parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;type, broadcast chan &amp;request, urgent chan &amp;response</parameter>
 		<declaration>/** Core process template
  *
  * DESCRIPTION
@@ -59,12 +52,12 @@ clock t;</declaration>
 rand_addr1 : int[0,1],
 rand_addr2 : int[0,1],
 rand_addr3 : int[0,1],
-rand_readwrite : int[0,1]</label>
+rand_type : int[0,1]</label>
 			<label kind="assignment" x="-833" y="-348">addr[0] = rand_addr0,
 addr[1] = rand_addr1,
 addr[2] = rand_addr2,
 addr[3] = rand_addr3,
-readwrite = rand_readwrite</label>
+type = rand_type</label>
 			<nail x="-756" y="-357"/>
 		</transition>
 		<transition>
@@ -117,79 +110,152 @@ clock t;</declaration>
 		</transition>
 	</template>
 	<template>
-		<name>Synchroniser</name>
-		<parameter>urgent chan &amp;request, chan &amp;response, broadcast chan &amp;cache_request[2], chan &amp;cache_response[2]</parameter>
-		<location id="id6" x="-42" y="0">
+		<name>CacheController</name>
+		<parameter>bool &amp;type, urgent chan &amp;req, chan &amp;done, broadcast chan &amp;status, urgent chan &amp;hit, urgent chan &amp;invalid, chan &amp;read, chan &amp;write, chan &amp;rewrite, chan &amp;overwrite, urgent chan &amp;cache_done, chan &amp;mem_req, urgent chan &amp;mem_done</parameter>
+		<location id="id6" x="-1369" y="-587">
+			<name x="-1378" y="-570">END</name>
 			<committed/>
 		</location>
-		<location id="id7" x="-212" y="0">
+		<location id="id7" x="-1369" y="-705">
 			<committed/>
 		</location>
-		<location id="id8" x="467" y="0">
-			<name x="416" y="-8">END</name>
+		<location id="id8" x="-1224" y="-705">
+			<name x="-1208" y="-714">CHECK_INVALID</name>
+			<urgent/>
+		</location>
+		<location id="id9" x="-1080" y="-705">
 			<committed/>
 		</location>
-		<location id="id9" x="298" y="102">
+		<location id="id10" x="-1223" y="-773">
+			<name x="-1334" y="-782">CHECK_HITW</name>
+			<urgent/>
 		</location>
-		<location id="id10" x="297" y="-93">
+		<location id="id11" x="-1504" y="-840">
+			<name x="-1513" y="-824">READING_MEM</name>
 		</location>
-		<location id="id11" x="119" y="0">
+		<location id="id12" x="-1599" y="-705">
+			<committed/>
 		</location>
-		<location id="id12" x="-382" y="0">
-			<name x="-392" y="-34">IDLE</name>
+		<location id="id13" x="-1369" y="-646">
+			<name x="-1463" y="-638">ACCESSING</name>
 		</location>
-		<init ref="id12"/>
-		<transition>
-			<source ref="id6"/>
-			<target ref="id11"/>
-			<label kind="synchronisation" x="-25" y="-17">cache_request[1]!</label>
-		</transition>
-		<transition>
-			<source ref="id7"/>
-			<target ref="id6"/>
-			<label kind="synchronisation" x="-195" y="-17">cache_request[0]!</label>
-		</transition>
-		<transition>
-			<source ref="id8"/>
-			<target ref="id12"/>
-			<label kind="synchronisation" x="485" y="-17">response!</label>
-			<nail x="637" y="0"/>
-			<nail x="637" y="153"/>
-			<nail x="-382" y="153"/>
-		</transition>
-		<transition>
-			<source ref="id9"/>
-			<target ref="id8"/>
-			<label kind="synchronisation" x="316" y="85">cache_response[0]?</label>
-			<nail x="467" y="102"/>
-		</transition>
+		<location id="id14" x="-1504" y="-900">
+			<name x="-1487" y="-909">CHECK_HITR</name>
+			<urgent/>
+		</location>
+		<location id="id15" x="-1223" y="-841">
+			<name x="-1207" y="-850">WRITE_START</name>
+			<committed/>
+		</location>
+		<location id="id16" x="-1504" y="-960">
+			<name x="-1487" y="-969">READ_START</name>
+			<committed/>
+		</location>
+		<location id="id17" x="-1368" y="-994">
+			<committed/>
+		</location>
+		<location id="id18" x="-1368" y="-1062">
+			<name x="-1378" y="-1096">IDLE</name>
+		</location>
+		<init ref="id18"/>
 		<transition>
 			<source ref="id11"/>
-			<target ref="id9"/>
-			<label kind="synchronisation" x="137" y="85">cache_response[1]?</label>
-			<nail x="119" y="102"/>
+			<target ref="id15"/>
+			<label kind="synchronisation" x="-1486" y="-857">mem_done?</label>
 		</transition>
 		<transition>
 			<source ref="id10"/>
 			<target ref="id8"/>
-			<label kind="synchronisation" x="314" y="-110">cache_response[1]?</label>
-			<nail x="467" y="-93"/>
+			<label kind="synchronisation" x="-1215" y="-748">status!</label>
 		</transition>
 		<transition>
-			<source ref="id11"/>
+			<source ref="id6"/>
+			<target ref="id18"/>
+			<label kind="synchronisation" x="-1351" y="-604">done!</label>
+			<nail x="-1004" y="-587"/>
+			<nail x="-1003" y="-1062"/>
+		</transition>
+		<transition>
+			<source ref="id13"/>
+			<target ref="id6"/>
+			<label kind="synchronisation" x="-1361" y="-629">cache_done?</label>
+		</transition>
+		<transition>
+			<source ref="id9"/>
+			<target ref="id13"/>
+			<label kind="synchronisation" x="-1072" y="-688">rewrite!</label>
+			<nail x="-1080" y="-646"/>
+		</transition>
+		<transition>
+			<source ref="id8"/>
+			<target ref="id13"/>
+			<label kind="synchronisation" x="-1216" y="-688">overwrite!</label>
+			<nail x="-1225" y="-646"/>
+		</transition>
+		<transition>
+			<source ref="id7"/>
+			<target ref="id13"/>
+			<label kind="synchronisation" x="-1360" y="-688">write!</label>
+		</transition>
+		<transition>
+			<source ref="id8"/>
+			<target ref="id7"/>
+			<label kind="synchronisation" x="-1343" y="-731">invalid?</label>
+		</transition>
+		<transition>
+			<source ref="id10"/>
+			<target ref="id9"/>
+			<label kind="synchronisation" x="-1165" y="-792">hit?</label>
+			<nail x="-1079" y="-773"/>
+		</transition>
+		<transition>
+			<source ref="id15"/>
 			<target ref="id10"/>
-			<label kind="synchronisation" x="137" y="-110">cache_response[0]?</label>
-			<nail x="119" y="-93"/>
+			<label kind="synchronisation" x="-1215" y="-815">status!</label>
+		</transition>
+		<transition>
+			<source ref="id14"/>
+			<target ref="id11"/>
+			<label kind="synchronisation" x="-1496" y="-883">mem_req!</label>
 		</transition>
 		<transition>
 			<source ref="id12"/>
-			<target ref="id7"/>
-			<label kind="synchronisation" x="-305" y="-17">request?</label>
+			<target ref="id13"/>
+			<label kind="synchronisation" x="-1591" y="-681">read!</label>
+			<nail x="-1599" y="-646"/>
+		</transition>
+		<transition>
+			<source ref="id14"/>
+			<target ref="id12"/>
+			<label kind="synchronisation" x="-1581" y="-918">hit?</label>
+			<nail x="-1598" y="-901"/>
+		</transition>
+		<transition>
+			<source ref="id16"/>
+			<target ref="id14"/>
+			<label kind="synchronisation" x="-1496" y="-942">status!</label>
+		</transition>
+		<transition>
+			<source ref="id17"/>
+			<target ref="id15"/>
+			<label kind="guard" x="-1351" y="-1020">type == WRITE</label>
+			<nail x="-1223" y="-994"/>
+		</transition>
+		<transition>
+			<source ref="id17"/>
+			<target ref="id16"/>
+			<label kind="guard" x="-1487" y="-1020">type == READ</label>
+			<nail x="-1504" y="-994"/>
+		</transition>
+		<transition>
+			<source ref="id18"/>
+			<target ref="id17"/>
+			<label kind="synchronisation" x="-1360" y="-1045">req?</label>
 		</transition>
 	</template>
 	<template>
 		<name>CacheLine</name>
-		<parameter>const int id, const int num_sets, bool &amp;addr[ADDR_WIDTH], bool &amp;readwrite, urgent chan &amp;cache_request, chan &amp;cache_response, chan &amp;memory_request, urgent chan &amp;memory_response, broadcast chan &amp;cache_hit, broadcast chan &amp;cache_miss</parameter>
+		<parameter>const int LINE_WIDTH, const bool line[MAX_LINE_WIDTH], bool &amp;addr[ADDR_WIDTH], urgent chan &amp;status, broadcast chan &amp;hit, broadcast chan &amp;miss, broadcast chan &amp;invalid, urgent chan &amp;read, urgent chan &amp;write, urgent chan &amp;rewrite, urgent chan &amp;overwrite, chan &amp;done, chan &amp;mem_req, urgent chan &amp;mem_res</parameter>
 		<declaration>/**
  */
 
@@ -198,310 +264,281 @@ const int TMAXR = 10;
 const int TMINW = 25;
 const int TMAXW = 30;
 
-bool line[LINE_WIDTH];
-bool tag[num_sets][TAG_WIDTH];
-bool valid[num_sets];
+const int TAG_WIDTH = ADDR_WIDTH - LINE_WIDTH;
+const int LINE_OFFSET = 0;
+const int TAG_OFFSET = LINE_OFFSET + LINE_WIDTH;
+
+bool tag[TAG_WIDTH];
+bool valid = false;
 
 // Local clock for timed cache accesses.
 clock t;
 
-void init_cache_line()
-{
-    for (i : int[0,LINE_WIDTH-1])
-    {
-        line[i] = (id &gt;&gt; (LINE_OFFSET+i)) &amp; 1;
-    }
-    for (i : int[0,num_sets-1])
-    {
-        valid[i] = false;
-    }
-}
-
-/** Process-local check for cache line.
- */
 bool is_cache_line()
 {
-    // Cache line if all line bits match.
-    return forall (i : int[0,LINE_WIDTH-1]) addr[LINE_OFFSET+i] == line[i];
+    return forall (i : int[0,LINE_WIDTH-1]) addr[i+LINE_OFFSET] == line[i];
 }
 
-/** Process-local check for cache hit.
- */
+bool is_cache_valid()
+{
+    return valid;
+}
+
 bool is_cache_hit()
 {
-    // Cache hit if cache line is valid and all tag bits match.
-    return exists (i : int[0,num_sets-1]) valid[i] and forall (j : int[0,TAG_WIDTH-1]) addr[TAG_OFFSET+j] == tag[i][j];
+    return forall (i : int[0,TAG_WIDTH-1]) addr[i+TAG_OFFSET] == tag[i];
 }
 
-/** Process-local procedure to update cache tag and valid bits.
- */
-void update_cache_line(const int set)
+void update_cache()
 {
-    // Only model tag, don't bother writing data.
-    for (i : int[0,TAG_WIDTH-1])
-    {
-        tag[set][i] = addr[TAG_OFFSET+i];
-    }
-
-    // Set cache valid bit.
-    valid[set] = true;
+    for (i : int[0,TAG_WIDTH-1]) tag[i] = addr[i+TAG_OFFSET];
+    valid = true;
 }</declaration>
-		<location id="id13" x="-380" y="-105">
-			<name x="-388" y="-137">START</name>
+		<location id="id19" x="-518" y="-841">
+			<name x="-535" y="-824">END</name>
 			<committed/>
 		</location>
-		<location id="id14" x="-84" y="-105">
-			<name x="-76" y="-129">READY</name>
+		<location id="id20" x="-706" y="-899">
+			<name x="-689" y="-908">WAITING</name>
+		</location>
+		<location id="id21" x="-706" y="-967">
+			<name x="-689" y="-984">WRITING</name>
+			<label kind="invariant" x="-689" y="-967">t &lt;= TMAXW</label>
+		</location>
+		<location id="id22" x="-519" y="-967">
+			<name x="-502" y="-984">READING</name>
+			<label kind="invariant" x="-502" y="-967">t &lt;= TMAXR</label>
+		</location>
+		<location id="id23" x="-706" y="-1044">
 			<committed/>
 		</location>
-		<location id="id15" x="228" y="-105">
-			<name x="236" y="-129">WRITE_START</name>
+		<location id="id24" x="-1045" y="-1105">
+			<name x="-1062" y="-1088">NOTSELECTED</name>
+		</location>
+		<location id="id25" x="-901" y="-1309">
+			<name x="-943" y="-1293">CHECK_LINE</name>
 			<committed/>
 		</location>
-		<location id="id16" x="740" y="-105">
-			<name x="756" y="-113">ACCESS_END</name>
+		<location id="id26" x="-748" y="-1247">
+			<name x="-799" y="-1229">CHECK_VALID</name>
 			<committed/>
 		</location>
-		<location id="id17" x="564" y="-33">
-			<name x="556" y="-81">WRITING_CACHE</name>
-			<label kind="invariant" x="556" y="-65">t &lt;= TMAXW</label>
+		<location id="id27" x="-884" y="-1103">
+			<name x="-867" y="-1121">INVALID</name>
 		</location>
-		<location id="id18" x="564" y="-177">
-			<name x="556" y="-161">WRITING_MEMORY</name>
-		</location>
-		<location id="id19" x="396" y="-249">
-			<name x="388" y="-297">READING_CACHE</name>
-			<label kind="invariant" x="388" y="-281">t &lt;= TMAXR</label>
-		</location>
-		<location id="id20" x="396" y="39">
-			<name x="388" y="55">READING_MEMORY</name>
-		</location>
-		<location id="id21" x="396" y="-105">
-			<name x="412" y="-121">WRITING</name>
-			<label kind="invariant" x="412" y="-105">t &lt;= TMAXW</label>
-		</location>
-		<location id="id22" x="228" y="-249">
-			<name x="220" y="-281">HIT_START</name>
+		<location id="id28" x="-612" y="-1188">
+			<name x="-654" y="-1171">CHECK_HIT</name>
 			<committed/>
 		</location>
-		<location id="id23" x="228" y="39">
-			<name x="220" y="55">MISS_START</name>
-			<committed/>
+		<location id="id29" x="-519" y="-1103">
+			<name x="-501" y="-1121">HIT</name>
 		</location>
-		<location id="id24" x="68" y="-105">
-			<name x="84" y="-113">ACCESS_START</name>
-			<committed/>
+		<location id="id30" x="-706" y="-1103">
+			<name x="-688" y="-1121">MISS</name>
 		</location>
-		<location id="id25" x="-228" y="-105">
-			<name x="-220" y="-129">IDLE</name>
-		</location>
-		<init ref="id13"/>
+		<init ref="id25"/>
 		<transition>
-			<source ref="id13"/>
+			<source ref="id29"/>
 			<target ref="id25"/>
-			<label kind="assignment" x="-364" y="-97">init_cache_line()</label>
+			<label kind="synchronisation" x="-586" y="-1122">status?</label>
+			<nail x="-1139" y="-1105"/>
+			<nail x="-1139" y="-1385"/>
+			<nail x="-901" y="-1385"/>
 		</transition>
 		<transition>
-			<source ref="id14"/>
+			<source ref="id30"/>
 			<target ref="id25"/>
-			<label kind="guard" x="-220" y="-201">!is_cache_line()</label>
-			<nail x="-84" y="-177"/>
-			<nail x="-228" y="-177"/>
+			<label kind="synchronisation" x="-773" y="-1122">status?</label>
+			<nail x="-1139" y="-1105"/>
+			<nail x="-1139" y="-1385"/>
+			<nail x="-901" y="-1385"/>
 		</transition>
 		<transition>
-			<source ref="id14"/>
-			<target ref="id24"/>
-			<label kind="guard" x="-68" y="-97">is_cache_line()</label>
-			<label kind="assignment" x="-68" y="-81">t = 0</label>
+			<source ref="id27"/>
+			<target ref="id25"/>
+			<label kind="synchronisation" x="-952" y="-1122">status?</label>
+			<nail x="-1139" y="-1105"/>
+			<nail x="-1139" y="-1385"/>
+			<nail x="-901" y="-1385"/>
 		</transition>
 		<transition>
-			<source ref="id15"/>
-			<target ref="id21"/>
-			<label kind="synchronisation" x="244" y="-97">memory_request!</label>
-		</transition>
-		<transition>
-			<source ref="id23"/>
-			<target ref="id15"/>
-			<label kind="guard" x="236" y="-41">readwrite == WRITE</label>
-		</transition>
-		<transition>
-			<source ref="id22"/>
-			<target ref="id15"/>
-			<label kind="guard" x="236" y="-185">readwrite == WRITE</label>
+			<source ref="id24"/>
+			<target ref="id25"/>
+			<label kind="synchronisation" x="-1122" y="-1122">status?</label>
+			<nail x="-1139" y="-1105"/>
+			<nail x="-1139" y="-1385"/>
+			<nail x="-901" y="-1385"/>
 		</transition>
 		<transition>
 			<source ref="id19"/>
-			<target ref="id16"/>
-			<label kind="guard" x="524" y="-273">t &gt;= TMINR</label>
-			<nail x="740" y="-249"/>
-		</transition>
-		<transition>
-			<source ref="id16"/>
 			<target ref="id25"/>
-			<label kind="select" x="748" y="-33">rand_set : int[0,num_sets-1]</label>
-			<label kind="synchronisation" x="748" y="-17">cache_response!</label>
-			<label kind="assignment" x="748" y="-1">update_cache_line(rand_set)</label>
-			<nail x="740" y="111"/>
-			<nail x="-228" y="111"/>
-		</transition>
-		<transition>
-			<source ref="id20"/>
-			<target ref="id17"/>
-			<label kind="synchronisation" x="412" y="-1">memory_response?</label>
-			<label kind="assignment" x="412" y="15">t = 0</label>
-			<nail x="564" y="39"/>
-		</transition>
-		<transition>
-			<source ref="id17"/>
-			<target ref="id16"/>
-			<label kind="guard" x="588" y="-25">t &gt;= TMINW</label>
-			<nail x="676" y="-33"/>
-		</transition>
-		<transition>
-			<source ref="id18"/>
-			<target ref="id16"/>
-			<label kind="synchronisation" x="580" y="-201">memory_response?</label>
-			<nail x="676" y="-177"/>
-		</transition>
-		<transition>
-			<source ref="id21"/>
-			<target ref="id17"/>
-			<label kind="synchronisation" x="412" y="-57">memory_response?</label>
-			<nail x="396" y="-33"/>
-		</transition>
-		<transition>
-			<source ref="id21"/>
-			<target ref="id18"/>
-			<label kind="guard" x="412" y="-201">t &gt;= TMINW</label>
-			<nail x="396" y="-177"/>
+			<label kind="synchronisation" x="-493" y="-858">done!</label>
+			<nail x="-374" y="-841"/>
+			<nail x="-374" y="-1385"/>
+			<nail x="-901" y="-1385"/>
 		</transition>
 		<transition>
 			<source ref="id22"/>
 			<target ref="id19"/>
-			<label kind="guard" x="244" y="-241">readwrite == READ</label>
+			<label kind="guard" x="-510" y="-943">t &gt;= TMINR</label>
+		</transition>
+		<transition>
+			<source ref="id20"/>
+			<target ref="id19"/>
+			<label kind="synchronisation" x="-688" y="-875">mem_res?</label>
+			<label kind="assignment" x="-688" y="-858">update_cache()</label>
+			<nail x="-705" y="-841"/>
+		</transition>
+		<transition>
+			<source ref="id21"/>
+			<target ref="id20"/>
+			<label kind="guard" x="-697" y="-942">t &gt;= TMINW</label>
 		</transition>
 		<transition>
 			<source ref="id23"/>
-			<target ref="id20"/>
-			<label kind="guard" x="244" y="-1">readwrite == READ</label>
-			<label kind="synchronisation" x="244" y="15">memory_request!</label>
+			<target ref="id21"/>
+			<label kind="synchronisation" x="-697" y="-1027">mem_req!</label>
+			<label kind="assignment" x="-697" y="-1010">t = 0</label>
 		</transition>
 		<transition>
-			<source ref="id24"/>
-			<target ref="id23"/>
-			<label kind="guard" x="84" y="-1">!is_cache_hit()</label>
-			<label kind="synchronisation" x="84" y="15">cache_miss!</label>
-			<nail x="68" y="39"/>
-		</transition>
-		<transition>
-			<source ref="id24"/>
+			<source ref="id29"/>
 			<target ref="id22"/>
-			<label kind="guard" x="84" y="-289">is_cache_hit()</label>
-			<label kind="synchronisation" x="84" y="-273">cache_hit!</label>
-			<nail x="68" y="-249"/>
+			<label kind="synchronisation" x="-510" y="-1027">read?</label>
+			<label kind="assignment" x="-510" y="-1010">t = 0</label>
+		</transition>
+		<transition>
+			<source ref="id30"/>
+			<target ref="id23"/>
+			<label kind="synchronisation" x="-697" y="-1087">overwrite?</label>
+		</transition>
+		<transition>
+			<source ref="id29"/>
+			<target ref="id23"/>
+			<label kind="synchronisation" x="-671" y="-1062">rewrite?</label>
+			<nail x="-519" y="-1044"/>
+		</transition>
+		<transition>
+			<source ref="id27"/>
+			<target ref="id23"/>
+			<label kind="synchronisation" x="-875" y="-1062">write?</label>
+			<nail x="-884" y="-1044"/>
 		</transition>
 		<transition>
 			<source ref="id25"/>
-			<target ref="id14"/>
-			<label kind="synchronisation" x="-212" y="-97">cache_request?</label>
+			<target ref="id24"/>
+			<label kind="guard" x="-1029" y="-1334">!is_cache_line()</label>
+			<nail x="-1045" y="-1309"/>
 		</transition>
-	</template>
-	<template>
-		<name>CacheCounter</name>
-		<parameter>urgent chan &amp;cache_hit, urgent chan &amp;cache_miss</parameter>
-		<declaration>/**
- */
-
-int cache_hits = 0;
-int cache_misses = 0;
-
-/** Greater than or equal to
- */
-bool hit_rate_ge(const int hit_rate)
-{
-    return cache_hits + cache_misses &gt; 0
-        &amp;&amp; (100 - hit_rate) * cache_hits &gt;= hit_rate * cache_misses;
-}</declaration>
-		<location id="id26" x="-266" y="-152">
-			<name x="-250" y="-160">IDLE</name>
-		</location>
-		<init ref="id26"/>
 		<transition>
-			<source ref="id26"/>
+			<source ref="id25"/>
 			<target ref="id26"/>
-			<label kind="synchronisation" x="-314" y="-64">cache_miss?</label>
-			<label kind="assignment" x="-314" y="-48">cache_misses++</label>
-			<nail x="-194" y="-72"/>
-			<nail x="-338" y="-72"/>
+			<label kind="guard" x="-884" y="-1334">is_cache_line()</label>
+			<nail x="-748" y="-1309"/>
 		</transition>
 		<transition>
 			<source ref="id26"/>
-			<target ref="id26"/>
-			<label kind="synchronisation" x="-314" y="-272">cache_hit?</label>
-			<label kind="assignment" x="-314" y="-256">cache_hits++</label>
-			<nail x="-194" y="-232"/>
-			<nail x="-338" y="-232"/>
+			<target ref="id27"/>
+			<label kind="guard" x="-884" y="-1272">!is_cache_valid()</label>
+			<label kind="synchronisation" x="-875" y="-1147">invalid!</label>
+			<nail x="-884" y="-1247"/>
+		</transition>
+		<transition>
+			<source ref="id26"/>
+			<target ref="id28"/>
+			<label kind="guard" x="-723" y="-1272">is_cache_valid()</label>
+			<nail x="-612" y="-1247"/>
+		</transition>
+		<transition>
+			<source ref="id28"/>
+			<target ref="id30"/>
+			<label kind="guard" x="-731" y="-1213">!is_cache_hit()</label>
+			<label kind="synchronisation" x="-697" y="-1147">miss!</label>
+			<nail x="-706" y="-1188"/>
+		</transition>
+		<transition>
+			<source ref="id28"/>
+			<target ref="id29"/>
+			<label kind="guard" x="-587" y="-1213">is_cache_hit()</label>
+			<label kind="synchronisation" x="-510" y="-1147">hit!</label>
+			<nail x="-519" y="-1188"/>
 		</transition>
 	</template>
 	<system>/** Main memory system
  * COPYRIGHT (c) 2018 Russell Maguire
  */
 
-// Address bus.
+/* Address bus */
 bool addr[ADDR_WIDTH];
-bool readwrite;
+bool type;
 
-// Channels
+/* For cache lines */
+const bool line[2][MAX_LINE_WIDTH] = {{0}, {1}};
+
+/* Channels */
 chan request;
 chan response;
 
-broadcast chan cache_request[2];
-chan cache_response[2];
+chan mem_request;
+chan mem_response;
 
-chan memory_request[2];
-chan memory_response[2];
+// Used to update and query cache line state
+broadcast chan cache_status;
 
-broadcast chan cache_hit[2];
-broadcast chan cache_miss[2];
+broadcast chan cache_hit;
+broadcast chan cache_miss;
+broadcast chan cache_invalid;
 
-// System processes
-core = Core(addr, readwrite, request, response);
-synchroniser = Synchroniser(
+// Cache operations
+chan cache_read;
+chan cache_write;
+chan cache_rewrite;
+chan cache_overwrite;
+
+chan cache_done;
+
+core = Core(
+    addr,
+    type,
+    request,
+    response
+);
+memory = Memory(
+    mem_request,
+    mem_response
+);
+cache_controller = CacheController(
+    type,
     request,
     response,
-    cache_request,
-    cache_response
+    cache_status,
+    cache_hit,
+    cache_invalid,
+    cache_read,
+    cache_write,
+    cache_rewrite,
+    cache_overwrite,
+    cache_done,
+    mem_request,
+    mem_response
 );
-
-// Two caches, one is direct mapped, the other is set associative
-cache_line(const int[1,2] num_sets, const int[0,LINE_MAX] id) = CacheLine(
-    id,
-    num_sets,
+cache_line(const int[0,1] idx) = CacheLine(
+    0,
+    line[idx],
     addr,
-    readwrite,
-    cache_request[num_sets-1],
-    cache_response[num_sets-1],
-    memory_request[num_sets-1],
-    memory_response[num_sets-1],
-    cache_hit[num_sets-1],
-    cache_miss[num_sets-1]
-);
-memory(const int[1,2] num_sets) = Memory(
-    memory_request[num_sets-1],
-    memory_response[num_sets-1]
-);
-cache_counter(const int[1,2] num_sets) = CacheCounter(
-    cache_hit[num_sets-1],
-    cache_miss[num_sets-1]
+    cache_status,
+    cache_hit,
+    cache_miss,
+    cache_invalid,
+    cache_read,
+    cache_write,
+    cache_rewrite,
+    cache_overwrite,
+    cache_done,
+    mem_request,
+    mem_response
 );
 
-// Direct mapped cache with one set, set associative cache with two sets.
-// Cannot leave this as a free process parameter due to select statement
-// with dependency on number of sets.
-dm_cache_line(const int[0,LINE_MAX] id) = cache_line(1, id);
-sa_cache_line(const int[0,LINE_MAX] id) = cache_line(2, id);
-
-system core, synchroniser, dm_cache_line, sa_cache_line, memory, cache_counter;</system>
+system core, memory, cache_controller, cache_line;</system>
 	<queries>
 		<query>
 			<formula>E&lt;&gt;synchroniser.END and (cache_counter(2).cache_hits &gt; cache_counter(1).cache_hits) and (cache_counter(2).cache_misses &lt; cache_counter(1).cache_misses)
