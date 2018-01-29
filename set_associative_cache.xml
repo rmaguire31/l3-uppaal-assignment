@@ -1,35 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
 <nta>
-	<declaration>/** Global declarations
- *
- * COPYRIGHT (c) 2018 Russell Maguire
- */
-
-// Bus specification.
+	<declaration>/* Bus specification. */
 const int ADDR_WIDTH = 4;
 const int MAX_LINE_WIDTH = 1;
 
 const bool READ = true;
-const bool WRITE = false;</declaration>
+const bool WRITE = false;
+
+/* Look up table for the function ceil(log2(x)) : int x in (0, 16] */
+const int CEIL_LOG2[17] = {
+     0, // Should be -inf
+        0, 1, 2,
+     2, 3, 3, 3,
+     3, 4, 4, 4,
+     4, 4, 4, 4,
+     4
+};</declaration>
 	<template>
 		<name x="5" y="5">Core</name>
 		<parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;type, broadcast chan &amp;request, urgent chan &amp;response</parameter>
-		<declaration>/** Core process template
- *
- * DESCRIPTION
- *    Template for process which generates randomly generates read and write requests
- *
- * INPUTS
- *    addr      - address bus array of boolean values
- *    readwrite - flag indicicating READ or WRITE
- *    request   - channel signaling memory request
- *    response  - channel signaling memory response
- *
- * COPYRIGHT (c) 2018 Russell Maguire
- */
-
-clock t;</declaration>
+		<declaration>clock t;</declaration>
 		<location id="id0" x="-1037" y="-569">
 			<name x="-1021" y="-578">END</name>
 			<committed/>
@@ -80,26 +71,23 @@ type = rand_type</label>
 	<template>
 		<name>Memory</name>
 		<parameter>urgent chan &amp;request, chan &amp;response</parameter>
-		<declaration>// MemController declarations
-// COPYRIGHT (c) 2018 Russell Maguire
-
-const int TMIN = 25;
+		<declaration>const int TMIN = 25;
 const int TMAX = 30;
 
 clock t;</declaration>
-		<location id="id4" x="-307" y="-373">
-			<name x="-291" y="-389">ACCESSING</name>
-			<label kind="invariant" x="-291" y="-373">t &lt;= TMAX</label>
+		<location id="id4" x="-289" y="-374">
+			<name x="-273" y="-390">ACCESSING</name>
+			<label kind="invariant" x="-273" y="-374">t &lt;= TMAX</label>
 		</location>
-		<location id="id5" x="-306" y="-450">
-			<name x="-290" y="-458">IDLE</name>
+		<location id="id5" x="-289" y="-450">
+			<name x="-273" y="-458">IDLE</name>
 		</location>
 		<init ref="id5"/>
 		<transition>
 			<source ref="id5"/>
 			<target ref="id4"/>
-			<label kind="synchronisation" x="-298" y="-432">request?</label>
-			<label kind="assignment" x="-298" y="-417">t = 0</label>
+			<label kind="synchronisation" x="-280" y="-433">request?</label>
+			<label kind="assignment" x="-280" y="-418">t = 0</label>
 		</transition>
 		<transition>
 			<source ref="id4"/>
@@ -113,6 +101,7 @@ clock t;</declaration>
 	<template>
 		<name>Controller</name>
 		<parameter>bool &amp;type, urgent chan &amp;req, chan &amp;done, chan &amp;mem_req, urgent chan &amp;mem_done, broadcast chan &amp;status, urgent chan &amp;hit, urgent chan &amp;miss, urgent chan &amp;invalid, chan &amp;read, chan &amp;write, chan &amp;rewrite, chan &amp;overwrite, urgent chan &amp;line_done, broadcast chan &amp;cache_hit, broadcast chan &amp;cache_miss</parameter>
+		<declaration>clock t;</declaration>
 		<location id="id6" x="-1071" y="-782">
 			<committed/>
 		</location>
@@ -168,10 +157,11 @@ clock t;</declaration>
 			<committed/>
 		</location>
 		<location id="id21" x="-1368" y="-994">
+			<name x="-1377" y="-977">START</name>
 			<committed/>
 		</location>
-		<location id="id22" x="-1368" y="-1062">
-			<name x="-1378" y="-1096">IDLE</name>
+		<location id="id22" x="-1368" y="-1071">
+			<name x="-1378" y="-1105">IDLE</name>
 		</location>
 		<init ref="id22"/>
 		<transition>
@@ -210,7 +200,7 @@ clock t;</declaration>
 			<target ref="id22"/>
 			<label kind="synchronisation" x="-1350" y="-621">done!</label>
 			<nail x="-909" y="-603"/>
-			<nail x="-909" y="-1061"/>
+			<nail x="-909" y="-1071"/>
 		</transition>
 		<transition>
 			<source ref="id17"/>
@@ -285,28 +275,29 @@ clock t;</declaration>
 		<transition>
 			<source ref="id22"/>
 			<target ref="id21"/>
-			<label kind="synchronisation" x="-1360" y="-1045">req?</label>
+			<label kind="synchronisation" x="-1360" y="-1054">req?</label>
+			<label kind="assignment" x="-1360" y="-1037">t = 0</label>
 		</transition>
 	</template>
 	<template>
 		<name>CacheLine</name>
 		<parameter>const int[0,MAX_LINE_WIDTH] LINE_WIDTH, const bool line[MAX_LINE_WIDTH], bool &amp;addr[ADDR_WIDTH], chan &amp;mem_req, urgent chan &amp;mem_res, urgent chan &amp;status, broadcast chan &amp;hit, broadcast chan &amp;miss, broadcast chan &amp;invalid, urgent chan &amp;read, urgent chan &amp;write, urgent chan &amp;rewrite, urgent chan &amp;overwrite, chan &amp;done</parameter>
-		<declaration>/**
- */
-
+		<declaration>/* Bounds for timed cache accesses */
 const int TMINR = 5;
 const int TMAXR = 10;
 const int TMINW = 25;
 const int TMAXW = 30;
 
+/* Address breakdown */
 const int TAG_WIDTH = ADDR_WIDTH - LINE_WIDTH;
 const int LINE_OFFSET = 0;
 const int TAG_OFFSET = LINE_OFFSET + LINE_WIDTH;
 
+/* State */
 bool tag[TAG_WIDTH];
 bool valid = false;
 
-// Local clock for timed cache accesses.
+/* Local clock for timed cache accesses. */
 clock t;
 
 bool is_cache_line()
@@ -496,121 +487,8 @@ void update_cache()
 			<nail x="-527" y="-1190"/>
 		</transition>
 	</template>
-	<template>
-		<name>Counter</name>
-		<parameter>const int MAX_REQUESTS, urgent chan &amp;hit, urgent chan &amp;miss</parameter>
-		<declaration>int[0,MAX_REQUESTS] num_misses = 0;
-int[0,MAX_REQUESTS] num_hits = 0;
-
-int num_requests()
-{
-    return num_misses + num_hits;
-}
-
-bool hit_rate_ge(const int test)
-{
-    return num_requests() &gt; 0
-        &amp;&amp; 100*num_hits &gt;= test*num_requests();
-}</declaration>
-		<location id="id35" x="-110" y="-42">
-			<name x="-93" y="-51">END</name>
-		</location>
-		<location id="id36" x="-110" y="-102">
-			<committed/>
-		</location>
-		<location id="id37" x="-110" y="-221">
-			<name x="-120" y="-255">IDLE</name>
-		</location>
-		<init ref="id37"/>
-		<transition>
-			<source ref="id36"/>
-			<target ref="id35"/>
-			<label kind="guard" x="-102" y="-85">num_requests() == MAX_REQUESTS</label>
-		</transition>
-		<transition>
-			<source ref="id36"/>
-			<target ref="id37"/>
-			<label kind="guard" x="-102" y="-136">num_requests() &lt; MAX_REQUESTS</label>
-		</transition>
-		<transition>
-			<source ref="id37"/>
-			<target ref="id36"/>
-			<label kind="synchronisation" x="-280" y="-221">miss?</label>
-			<label kind="assignment" x="-280" y="-204">num_misses++</label>
-			<nail x="-161" y="-221"/>
-			<nail x="-161" y="-102"/>
-		</transition>
-		<transition>
-			<source ref="id37"/>
-			<target ref="id36"/>
-			<label kind="synchronisation" x="-51" y="-221">hit?</label>
-			<label kind="assignment" x="-51" y="-204">num_hits++</label>
-			<nail x="-59" y="-221"/>
-			<nail x="-59" y="-102"/>
-		</transition>
-	</template>
-	<template>
-		<name>Coordinator</name>
-		<parameter>const int NUM_CACHES, urgent chan &amp;core_request, chan &amp;core_response, chan &amp;cache_request, urgent chan &amp;cache_response</parameter>
-		<declaration>int num_requests = 0;</declaration>
-		<location id="id38" x="-612" y="-204">
-			<name x="-680" y="-187">CHECK_RESPONSES</name>
-			<committed/>
-		</location>
-		<location id="id39" x="-612" y="-280">
-			<name x="-697" y="-288">WAITING</name>
-		</location>
-		<location id="id40" x="-612" y="-365">
-			<name x="-722" y="-373">REQUESTING</name>
-			<committed/>
-		</location>
-		<location id="id41" x="-612" y="-442">
-			<name x="-595" y="-450">IDLE</name>
-		</location>
-		<init ref="id41"/>
-		<transition>
-			<source ref="id39"/>
-			<target ref="id38"/>
-			<label kind="synchronisation" x="-603" y="-263">cache_response?</label>
-			<label kind="assignment" x="-603" y="-246">num_requests--</label>
-		</transition>
-		<transition>
-			<source ref="id38"/>
-			<target ref="id41"/>
-			<label kind="guard" x="-773" y="-238">num_requests == 0</label>
-			<label kind="synchronisation" x="-773" y="-221">core_response!</label>
-			<nail x="-790" y="-204"/>
-			<nail x="-790" y="-442"/>
-		</transition>
-		<transition>
-			<source ref="id40"/>
-			<target ref="id39"/>
-			<label kind="guard" x="-603" y="-322">num_requests == NUM_CACHES</label>
-		</transition>
-		<transition>
-			<source ref="id38"/>
-			<target ref="id39"/>
-			<label kind="guard" x="-586" y="-221">num_requests &gt; 0</label>
-			<nail x="-433" y="-204"/>
-			<nail x="-433" y="-280"/>
-		</transition>
-		<transition>
-			<source ref="id41"/>
-			<target ref="id40"/>
-			<label kind="synchronisation" x="-603" y="-425">core_request?</label>
-		</transition>
-		<transition>
-			<source ref="id40"/>
-			<target ref="id40"/>
-			<label kind="guard" x="-518" y="-390">num_requests &lt; NUM_CACHES</label>
-			<label kind="synchronisation" x="-518" y="-373">cache_request!</label>
-			<label kind="assignment" x="-518" y="-356">num_requests++</label>
-			<nail x="-527" y="-331"/>
-			<nail x="-527" y="-399"/>
-		</transition>
-	</template>
-	<system>/** Main memory system
- * COPYRIGHT (c) 2018 Russell Maguire
+	<system>/** Set associative cache system
+ * COPYRIGHT (c) 2018 Z0996690
  */
 
 /* Address bus */
@@ -619,116 +497,113 @@ bool type;
 
 /* Line identifiers */
 const int NUM_LINES = 2;
-const int LINE_WIDTH = 1;
 const bool LINE_ID[NUM_LINES][MAX_LINE_WIDTH] = {{0}, {1}};
 
-/* Separate core  */
+/* Separate core and memory channels */
 chan core_request;
 chan core_response;
 
+chan mem_request;
+chan mem_response;
+
 /* Cache channels */
-const int NUM_CACHES = 2;
-const int DM = 0; // Direct mapped.
-const int FA = 1; // Fully associative.
+broadcast chan cache_hit;
+broadcast chan cache_miss;
 
-chan cache_request;
-chan cache_response;
+broadcast chan line_status;
+broadcast chan line_hit;
+broadcast chan line_miss;
+broadcast chan line_invalid;
 
-broadcast chan cache_hit[NUM_CACHES];
-broadcast chan cache_miss[NUM_CACHES];
+chan line_read;
+chan line_write;
+chan line_rewrite;
+chan line_overwrite;
+chan line_done;
 
-broadcast chan line_status[NUM_CACHES];
-broadcast chan line_hit[NUM_CACHES];
-broadcast chan line_miss[NUM_CACHES];
-broadcast chan line_invalid[NUM_CACHES];
-
-chan line_read[NUM_CACHES];
-chan line_write[NUM_CACHES];
-chan line_rewrite[NUM_CACHES];
-chan line_overwrite[NUM_CACHES];
-chan line_done[NUM_CACHES];
-
-/* Memory channels */
-chan mem_request[NUM_CACHES];
-chan mem_response[NUM_CACHES];
-
-/* Parameterised cache processes */
-CacheLines(const int[0,NUM_CACHES-1] cache, const int[0,NUM_LINES-1] line, const int[0,LINE_WIDTH] line_width) = CacheLine(
-    line_width,
+/* Parameterised cache line process */
+CacheLines(const int line, const int num_lines, const int num_sets) = CacheLine(
+    CEIL_LOG2[num_lines/num_sets],
     LINE_ID[line],
     addr,
-    mem_request[cache],
-    mem_response[cache],
-    line_status[cache],
-    line_hit[cache],
-    line_miss[cache],
-    line_invalid[cache],
-    line_read[cache],
-    line_write[cache],
-    line_rewrite[cache],
-    line_overwrite[cache],
-    line_done[cache]
-);
-CacheController(const int[0,NUM_CACHES-1] cache) = Controller(
-    type,
-    cache_request,
-    cache_response,
-    mem_request[cache],
-    mem_response[cache],
-    line_status[cache],
-    line_hit[cache],
-    line_miss[cache],
-    line_invalid[cache],
-    line_read[cache],
-    line_write[cache],
-    line_rewrite[cache],
-    line_overwrite[cache],
-    line_done[cache],
-    cache_hit[cache],
-    cache_miss[cache]
-);
-CacheCounter(const int[0,NUM_CACHES-1] cache) = Counter(
-    16, // Only count the first 16 read requests.
-    cache_hit[cache],
-    cache_miss[cache]
-);
-CacheMemory(const int[0,NUM_CACHES-1] cache) = Memory(
-    mem_request[cache],
-    mem_response[cache]
-);
+    mem_request,
+    mem_response,
+    line_status,
+    line_hit,
+    line_miss,
+    line_invalid,
+    line_read,
+    line_write,
+    line_rewrite,
+    line_overwrite,
+    line_done
+); 
 
-// Core and memory processes
+/* Core and memory processes */
 core = Core(addr, type, core_request, core_response);
+memory = Memory(mem_request, mem_response);
 
-// Coordinate both caches
-coord = Coordinator(NUM_CACHES, core_request, core_response, cache_request, cache_response);
+/* Fully associative cache, two lines, two-way set associativity */
+fa_controller = Controller(
+    type,
+    core_request,
+    core_response,
+    mem_request,
+    mem_response,
+    line_status,
+    line_hit,
+    line_miss,
+    line_invalid,
+    line_read,
+    line_write,
+    line_rewrite,
+    line_overwrite,
+    line_done,
+    cache_hit,
+    cache_miss
+);
+fa_lines(const int[0,NUM_LINES-1] line) = CacheLines(line, NUM_LINES, NUM_LINES);
 
-// Direct mapped cache
-dm_controller = CacheController(DM);
-dm_lines(const int[0,NUM_LINES-1] line_idx) = CacheLines(DM, line_idx, LINE_WIDTH);
-dm_memory = CacheMemory(DM);
-dm_counter = CacheCounter(DM);
-
-// Fully associative cache
-fa_controller = CacheController(FA);
-fa_lines(const int[0,NUM_LINES-1] line_idx) = CacheLines(FA, line_idx, 0);
-fa_memory = CacheMemory(FA);
-fa_counter = CacheCounter(FA);
-
-system core, coord,
-    dm_controller, dm_lines, dm_memory, dm_counter,
-    fa_controller, fa_lines, fa_memory, fa_counter;</system>
+system core, memory, fa_controller, fa_lines;</system>
 	<queries>
 		<query>
-			<formula>E&lt;&gt; (fa_counter.num_requests() == dm_counter.num_requests()) and (fa_counter.num_hits &gt; dm_counter.num_hits)
+			<formula>A[] not deadlock
 			</formula>
-			<comment>
+			<comment>Tests for deadlock.
+Verification/kernel/elapsed time used: 2.07s / 0.65s / 2.751s.
+Resident/virtual memory usage peaks: 12,952KB / 32,088KB.
+			</comment>
+		</query>
+		<query>
+			<formula>core.START --&gt; core.END and core.t &lt;= 30
+			</formula>
+			<comment>Tests tigher upper bound for request response time. Should not pass.
+Verification/kernel/elapsed time used: 0.04s / 0.06s / 0.102s.
+Resident/virtual memory usage peaks: 33,056KB / 52,176KB.
+			</comment>
+		</query>
+		<query>
+			<formula>core.START --&gt; core.END and core.t &gt;= 25
+			</formula>
+			<comment>Tests relaxed lower bound for request response time. Should not pass.
+Verification/kernel/elapsed time used: 0.09s / 0.16s / 0.268s.
+Resident/virtual memory usage peaks: 31,464KB / 50,820KB.
 			</comment>
 		</query>
 		<query>
 			<formula>core.START --&gt; core.END and core.t &lt;= 60
 			</formula>
-			<comment>
+			<comment>Tests relaxed upper bound for request response time.
+Verification/kernel/elapsed time used: 3.73s / 0.71s / 4.485s.
+Resident/virtual memory usage peaks: 33,056KB / 52,228KB.
+			</comment>
+		</query>
+		<query>
+			<formula>core.START --&gt; core.END and core.t &gt;= 5
+			</formula>
+			<comment>Tests relaxed lower bound for request response time.
+Verification/kernel/elapsed time used: 3.49s / 0.68s / 4.209s.
+Resident/virtual memory usage peaks: 33,056KB / 52,228KB.
 			</comment>
 		</query>
 	</queries>

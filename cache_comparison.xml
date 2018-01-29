@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
 <nta>
-	<declaration>/* Bus specification */
+	<declaration>/* Bus specification. */
 const int ADDR_WIDTH = 4;
 const int MAX_LINE_WIDTH = 1;
 
@@ -71,7 +71,8 @@ type = rand_type</label>
 	<template>
 		<name>Memory</name>
 		<parameter>urgent chan &amp;request, chan &amp;response</parameter>
-		<declaration>const int TMIN = 25;
+		<declaration>/* Timing constraints */
+const int TMIN = 25;
 const int TMAX = 30;
 
 clock t;</declaration>
@@ -282,7 +283,7 @@ clock t;</declaration>
 	<template>
 		<name>CacheLine</name>
 		<parameter>const int[0,MAX_LINE_WIDTH] LINE_WIDTH, const bool line[MAX_LINE_WIDTH], bool &amp;addr[ADDR_WIDTH], chan &amp;mem_req, urgent chan &amp;mem_res, urgent chan &amp;status, broadcast chan &amp;hit, broadcast chan &amp;miss, broadcast chan &amp;invalid, urgent chan &amp;read, urgent chan &amp;write, urgent chan &amp;rewrite, urgent chan &amp;overwrite, chan &amp;done</parameter>
-		<declaration>/* Timing bounds */
+		<declaration>/* Cache timing constraints for read and write */
 const int TMINR = 5;
 const int TMAXR = 10;
 const int TMINW = 25;
@@ -293,11 +294,11 @@ const int TAG_WIDTH = ADDR_WIDTH - LINE_WIDTH;
 const int LINE_OFFSET = 0;
 const int TAG_OFFSET = LINE_OFFSET + LINE_WIDTH;
 
-/* State */
+/* Line state */
 bool tag[TAG_WIDTH];
 bool valid = false;
 
-/* Local clock for timed cache accesses */
+/* Local clock for timed cache accesses. */
 clock t;
 
 bool is_cache_line()
@@ -510,7 +511,7 @@ bool hit_rate_ge(const int test)
 			<committed/>
 		</location>
 		<location id="id37" x="-671" y="-357">
-			<name x="-680" y="-391">IDLE</name>
+			<name x="-663" y="-340">IDLE</name>
 		</location>
 		<init ref="id37"/>
 		<transition>
@@ -540,8 +541,68 @@ bool hit_rate_ge(const int test)
 			<nail x="-603" y="-246"/>
 		</transition>
 	</template>
-	<system>/** Direct mapped cache system
- * COPYRIGHT (c) 2018 Z0996690
+	<template>
+		<name>Coordinator</name>
+		<parameter>const int NUM_CACHES, urgent chan &amp;core_request, chan &amp;core_response, chan &amp;cache_request, urgent chan &amp;cache_response</parameter>
+		<declaration>int num_requests = 0;</declaration>
+		<location id="id38" x="-612" y="-204">
+			<name x="-680" y="-187">CHECK_RESPONSES</name>
+			<committed/>
+		</location>
+		<location id="id39" x="-612" y="-280">
+			<name x="-697" y="-288">WAITING</name>
+		</location>
+		<location id="id40" x="-612" y="-365">
+			<name x="-722" y="-373">REQUESTING</name>
+			<committed/>
+		</location>
+		<location id="id41" x="-612" y="-442">
+			<name x="-595" y="-450">IDLE</name>
+		</location>
+		<init ref="id41"/>
+		<transition>
+			<source ref="id39"/>
+			<target ref="id38"/>
+			<label kind="synchronisation" x="-603" y="-263">cache_response?</label>
+			<label kind="assignment" x="-603" y="-246">num_requests--</label>
+		</transition>
+		<transition>
+			<source ref="id38"/>
+			<target ref="id41"/>
+			<label kind="guard" x="-773" y="-238">num_requests == 0</label>
+			<label kind="synchronisation" x="-773" y="-221">core_response!</label>
+			<nail x="-790" y="-204"/>
+			<nail x="-790" y="-442"/>
+		</transition>
+		<transition>
+			<source ref="id40"/>
+			<target ref="id39"/>
+			<label kind="guard" x="-603" y="-322">num_requests == NUM_CACHES</label>
+		</transition>
+		<transition>
+			<source ref="id38"/>
+			<target ref="id39"/>
+			<label kind="guard" x="-586" y="-221">num_requests &gt; 0</label>
+			<nail x="-433" y="-204"/>
+			<nail x="-433" y="-280"/>
+		</transition>
+		<transition>
+			<source ref="id41"/>
+			<target ref="id40"/>
+			<label kind="synchronisation" x="-603" y="-425">core_request?</label>
+		</transition>
+		<transition>
+			<source ref="id40"/>
+			<target ref="id40"/>
+			<label kind="guard" x="-518" y="-390">num_requests &lt; NUM_CACHES</label>
+			<label kind="synchronisation" x="-518" y="-373">cache_request!</label>
+			<label kind="assignment" x="-518" y="-356">num_requests++</label>
+			<nail x="-527" y="-331"/>
+			<nail x="-527" y="-399"/>
+		</transition>
+	</template>
+	<system>/** Direct mapped cache and two-way set associative cache comparison system
+ * COPYRIGHT (C) 2018 Z0996690
  */
 
 /* Address bus */
@@ -552,125 +613,143 @@ bool type;
 const int NUM_LINES = 2;
 const bool LINE_ID[NUM_LINES][MAX_LINE_WIDTH] = {{0}, {1}};
 
-/* Separate core and memory channels */
+/* Separate core  */
 chan core_request;
 chan core_response;
 
-chan mem_request;
-chan mem_response;
-
 /* Cache channels */
-broadcast chan cache_hit;
-broadcast chan cache_miss;
+const int NUM_CACHES = 2;
+const int DMC = 0; // Direct mapped.
+const int FAC = 1; // Fully associative.
 
-broadcast chan line_status;
-broadcast chan line_hit;
-broadcast chan line_miss;
-broadcast chan line_invalid;
+chan cache_request;
+chan cache_response;
 
-chan line_read;
-chan line_write;
-chan line_rewrite;
-chan line_overwrite;
-chan line_done;
+broadcast chan cache_hit[NUM_CACHES];
+broadcast chan cache_miss[NUM_CACHES];
 
-/* Parameterised cache line process */
-CacheLines(const int line, const int num_lines, const int num_sets) = CacheLine(
+broadcast chan line_status[NUM_CACHES];
+broadcast chan line_hit[NUM_CACHES];
+broadcast chan line_miss[NUM_CACHES];
+broadcast chan line_invalid[NUM_CACHES];
+
+chan line_read[NUM_CACHES];
+chan line_write[NUM_CACHES];
+chan line_rewrite[NUM_CACHES];
+chan line_overwrite[NUM_CACHES];
+chan line_done[NUM_CACHES];
+
+/* Memory channels */
+chan mem_request[NUM_CACHES];
+chan mem_response[NUM_CACHES];
+
+/* Parameterised cache processes */
+CacheLines(const int cache, const int line, const int num_lines, const int num_sets) = CacheLine(
     CEIL_LOG2[num_lines/num_sets],
     LINE_ID[line],
     addr,
-    mem_request,
-    mem_response,
-    line_status,
-    line_hit,
-    line_miss,
-    line_invalid,
-    line_read,
-    line_write,
-    line_rewrite,
-    line_overwrite,
-    line_done
-); 
+    mem_request[cache],
+    mem_response[cache],
+    line_status[cache],
+    line_hit[cache],
+    line_miss[cache],
+    line_invalid[cache],
+    line_read[cache],
+    line_write[cache],
+    line_rewrite[cache],
+    line_overwrite[cache],
+    line_done[cache]
+);
+CacheController(const int cache) = Controller(
+    type,
+    cache_request,
+    cache_response,
+    mem_request[cache],
+    mem_response[cache],
+    line_status[cache],
+    line_hit[cache],
+    line_miss[cache],
+    line_invalid[cache],
+    line_read[cache],
+    line_write[cache],
+    line_rewrite[cache],
+    line_overwrite[cache],
+    line_done[cache],
+    cache_hit[cache],
+    cache_miss[cache]
+);
+CacheCounter(const int cache) = Counter(
+    3, // Only count the first 3 read requests which is minimum for sac achieve more hits than dmc
+    cache_hit[cache],
+    cache_miss[cache]
+);
+CacheMemory(const int cache) = Memory(
+    mem_request[cache],
+    mem_response[cache]
+);
 
 /* Core and memory processes */
 core = Core(addr, type, core_request, core_response);
-memory = Memory(mem_request, mem_response);
+
+/* Coordinate both caches */
+coord = Coordinator(NUM_CACHES, core_request, core_response, cache_request, cache_response);
 
 /* Direct mapped cache, two lines, one-way set associativity */
-dmc_controller = Controller(
-    type,
-    core_request,
-    core_response,
-    mem_request,
-    mem_response,
-    line_status,
-    line_hit,
-    line_miss,
-    line_invalid,
-    line_read,
-    line_write,
-    line_rewrite,
-    line_overwrite,
-    line_done,
-    cache_hit,
-    cache_miss
-);
-dmc_lines(const int[0,NUM_LINES-1] line) = CacheLines(line, NUM_LINES, 1);
-dmc_counter = Counter(
-    10, // Only count the first 10 requests. The minimum to verify 90% hit rate.
-    cache_hit,
-    cache_miss
-);
+dmc_controller = CacheController(DMC);
+dmc_lines(const int[0,NUM_LINES-1] line) = CacheLines(DMC, line, NUM_LINES, 1);
+dmc_memory = CacheMemory(DMC);
+dmc_counter = CacheCounter(DMC);
 
-system core, memory, dmc_controller, dmc_lines, dmc_counter;</system>
+/* Fully associative cache, two lines, two-way set associativity */
+fac_controller = CacheController(FAC);
+fac_lines(const int[0,NUM_LINES-1] line) = CacheLines(FAC, line, NUM_LINES, NUM_LINES);
+fac_memory = CacheMemory(FAC);
+fac_counter = CacheCounter(FAC);
+
+system core, coord,
+    dmc_controller, dmc_lines, dmc_memory, dmc_counter,
+    fac_controller, fac_lines, fac_memory, fac_counter;</system>
 	<queries>
 		<query>
 			<formula>A[] not deadlock
 			</formula>
-			<comment>Tests whether the state deadlocks.
-Verification/kernel/elapsed time used: 13.5s / 0.66s / 14.178s.
-Resident/virtual memory usage peaks: 105,140KB / 119,860KB.
+			<comment>
 			</comment>
 		</query>
 		<query>
 			<formula>core.START --&gt; core.END and core.t &lt;= 30
 			</formula>
-			<comment>Tests tight upper bound for response time. Should not pass.
-Verification/kernel/elapsed time used: 0.56s / 0.02s / 0.578s.
-Resident/virtual memory usage peaks: 105,144KB / 119,864KB.
+			<comment>Test tighter upper bound for response time. Should not pass.
+Verification/kernel/elapsed time used: 0.23s / 0.4s / 0.644s.
+Resident/virtual memory usage peaks: 5,952KB / 25,456KB.
 			</comment>
 		</query>
 		<query>
 			<formula>core.START --&gt; core.END and core.t &lt;= 25
 			</formula>
-			<comment>Tests tight lower bound for response time. Should not pass.
-Verification/kernel/elapsed time used: 0.02s / 0.01s / 0.031s.
-Resident/virtual memory usage peaks: 95,532KB / 114,924KB.
+			<comment>Test tighter lower bound for response time. Should not pass.
+Verification/kernel/elapsed time used: 0.05s / 0.04s / 0.097s.
+Resident/virtual memory usage peaks: 6,404KB / 25,968KB.
 			</comment>
 		</query>
 		<query>
 			<formula>core.START --&gt; core.END and core.t &lt;= 60
 			</formula>
-			<comment>Tests relaxed upper bound for response time.
-Verification/kernel/elapsed time used: 23.78s / 0.76s / 24.558s.
-Resident/virtual memory usage peaks: 264,764KB / 279,660KB.
+			<comment>Does not verify. Runs out of memory.
 			</comment>
 		</query>
 		<query>
 			<formula>core.START --&gt; core.END and core.t &gt;= 5
 			</formula>
-			<comment>Tests relaxed upper bound for response time.
-Verification/kernel/elapsed time used: 24.64s / 0.62s / 25.274s.
-Resident/virtual memory usage peaks: 275,648KB / 279,660KB.
+			<comment>Does not verify. Runs out of memory.
 			</comment>
 		</query>
 		<query>
-			<formula>E&lt;&gt; dmc_counter.hit_rate_ge(90)
+			<formula>E&lt;&gt; (fac_counter.num_requests() == dmc_counter.num_requests()) and (fac_counter.num_hits &gt; dmc_counter.num_hits)
 			</formula>
-			<comment>Tests whether there exists a sequence of requests with a hit rate greater than or equal to 90%.
-Satisfied by ten requests of to the same address, eg. [0,0,0,0].
-Verification/kernel/elapsed time used: 5.44s / 0.67s / 6.12s.
-Resident/virtual memory usage peaks: 275,648KB / 278,648KB.
+			<comment>Tests if there exists a sequence of requests where the two-way set associative cache outperforms the direct mapped cache.
+Verification/kernel/elapsed time used: 41.59s / 0.74s / 42.389s.
+Resident/virtual memory usage peaks: 132,588KB / 145,664KB.
 			</comment>
 		</query>
 	</queries>
