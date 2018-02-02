@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
 <nta>
-	<declaration>/* Bus specification. */
+	<declaration>/** Global constants
+ *
+ * COPYRIGHT (C) 2018 Z0996690
+ */
+
+// Bus specification
+// These are used in parameter declarations so need to be global.
 const int ADDR_WIDTH = 4;
 const int MAX_LINE_WIDTH = 1;
 
@@ -10,7 +16,42 @@ const bool WRITE = false;</declaration>
 	<template>
 		<name x="5" y="5">Core</name>
 		<parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;type, broadcast chan &amp;request, urgent chan &amp;response</parameter>
-		<declaration>clock t;</declaration>
+		<declaration>/** Core process template
+ *
+ * DESCRIPTION
+ *  This template is used to create processes which
+ *  non-deterministically make a sequence of access
+ *  requests and time their responses.
+ *
+ *  The process can wait in the IDLE state for an
+ *  indefinite time before non-deterministically
+ *  selecting the address to access and the access
+ *  type, which can be read or write.
+ *
+ * ARGUMENTS
+ *      addr : Reference to a shared array of bits
+ *             which is the address bus. This avoids
+ *             the address bus being in the global
+ *             scope.
+ *      type : Reference to a shared flag which is
+ *             the type of access request. This can
+ *             be READ (true|1) or WRITE (false|0).
+ *   request : Reference to shared channel which the
+ *             core uses to issue requests after
+ *             selecting the address and access type.
+ *             Channel parameter allows templates to
+ *             be reused.
+ *  response : Reference to shared channel which the
+ *             core listens to before considering the
+ *             request fulfilled. This channel is
+ *             qualified as urgent, to prevent the
+ *             process blocking after another process
+ *             signals a response. Channel parameter
+ *             allows templates to be reused.
+ */
+
+// Local clock used to time responses
+clock t;</declaration>
 		<location id="id0" x="-1037" y="-569">
 			<name x="-1021" y="-578">END</name>
 			<committed/>
@@ -61,10 +102,38 @@ type = rand_type</label>
 	<template>
 		<name>Memory</name>
 		<parameter>urgent chan &amp;request, chan &amp;response</parameter>
-		<declaration>const int TMIN = 25;
-const int TMAX = 30;
+		<declaration>/** Memory process template
+ *
+ * DESCRIPTION
+ *  This template is used to simulate the delay
+ *  associated with main memory accesses and the
+ *  variability which can occur in them.
+ *
+ *  The process can wait in the IDLE state for an
+ *  indefinite time until a request is received.
+ *  The invariant and guard ensures 25 to 30 ns of
+ *  time passes before the response is sent.
+ *
+ * ARGUMENTS
+ *   request : Reference to shared channel which the
+ *             memory listens to before timed 'ACCESSING'.
+ *             This channel is qualified as urgent, to
+ *             prevent the process blocking after another
+ *             process signals a request for access.
+ *             Channel parameter allows templates to be
+ *             reused.
+ *  response : Reference to shared channel which the
+ *             memory uses to indicate the end of the
+ *             timed access. Channel parameter allows
+ *             templates to be reused.
+ */
 
-clock t;</declaration>
+// Local clock used to enforce access time.
+clock t;
+
+// Timing bounds used in guard and invariant.
+const int TMIN = 25; // ns
+const int TMAX = 30; // ns</declaration>
 		<location id="id4" x="-289" y="-374">
 			<name x="-273" y="-390">ACCESSING</name>
 			<label kind="invariant" x="-273" y="-374">t &lt;= TMAX</label>
@@ -92,15 +161,15 @@ clock t;</declaration>
  * COPYRIGHT (c) 2018 Z0996690
  */
 
-/* Address bus */
+// Address bus
 bool addr[ADDR_WIDTH];
 bool type;
 
-/* Channels */
+// Channels
 chan request;
 chan response;
 
-/* Core and memory processes */
+// Core and memory processes
 core = Core(addr, type, request, response);
 memory = Memory(request, response);
 

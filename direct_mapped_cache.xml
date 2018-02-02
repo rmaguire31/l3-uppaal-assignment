@@ -1,14 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
 <nta>
-	<declaration>/* Bus specification */
+	<declaration>/** Global constants
+ *
+ * COPYRIGHT (C) 2018 Z0996690
+ */
+
+// Bus specification
+// These are used in parameter declarations so need to be global.
 const int ADDR_WIDTH = 4;
 const int MAX_LINE_WIDTH = 1;
 
 const bool READ = true;
 const bool WRITE = false;
 
-/* Look up table for the function ceil(log2(x)) : int x in (0, 16] */
+// Look up table for the function ceil(log2(x)) : int x in (0, 16]
+// This is used to compute the number of bits to encode a
+// number of lines
 const int CEIL_LOG2[17] = {
      0, // Should be -inf
         0, 1, 2,
@@ -20,7 +28,44 @@ const int CEIL_LOG2[17] = {
 	<template>
 		<name x="5" y="5">Core</name>
 		<parameter>bool &amp;addr[ADDR_WIDTH], bool &amp;type, broadcast chan &amp;request, urgent chan &amp;response</parameter>
-		<declaration>clock t;</declaration>
+		<declaration>/** Core process template
+ *
+ * DESCRIPTION
+ *  This template is used to create processes which
+ *  non-deterministically make a sequence of access
+ *  requests and time their responses.
+ *
+ *  The process can wait in the IDLE state for an
+ *  indefinite time before non-deterministically
+ *  selecting the address to access and the access
+ *  type, which can be read or write.
+ *
+ * ARGUMENTS
+ *      addr : Reference to a shared array of bits
+ *             which is the address bus. This avoids
+ *             the address bus being in the global
+ *             scope.
+ *      type : Reference to a shared flag which is
+ *             the type of access request. This can
+ *             be READ (true|1) or WRITE (false|0).
+ *   request : Reference to shared channel which the
+ *             core uses to issue requests after
+ *             selecting the address and access type.
+ *             Channel parameter allows templates to
+ *             be reused.
+ *  response : Reference to shared channel which the
+ *             core listens to before considering the
+ *             request fulfilled. This channel is
+ *             qualified as urgent, to prevent the
+ *             process blocking after another process
+ *             signals a response. Channel parameter
+ *             allows templates to be reused.
+ *
+ * COPYRIGHT (C) 2018 Z0996690
+ */
+
+// Local clock used to time responses
+clock t;</declaration>
 		<location id="id0" x="-1037" y="-569">
 			<name x="-1021" y="-578">END</name>
 			<committed/>
@@ -71,10 +116,40 @@ type = rand_type</label>
 	<template>
 		<name>Memory</name>
 		<parameter>urgent chan &amp;request, chan &amp;response</parameter>
-		<declaration>const int TMIN = 25;
-const int TMAX = 30;
+		<declaration>/** Memory process template
+ *
+ * DESCRIPTION
+ *  This template is used to simulate the delay
+ *  associated with main memory accesses and the
+ *  variability which can occur in them.
+ *
+ *  The process can wait in the IDLE state for an
+ *  indefinite time until a request is received.
+ *  The invariant and guard ensures 25 to 30 ns of
+ *  time passes before the response is sent.
+ *
+ * ARGUMENTS
+ *   request : Reference to shared channel which the
+ *             memory listens to before timed 'ACCESSING'.
+ *             This channel is qualified as urgent, to
+ *             prevent the process blocking after another
+ *             process signals a request for access.
+ *             Channel parameter allows templates to be
+ *             reused.
+ *  response : Reference to shared channel which the
+ *             memory uses to indicate the end of the
+ *             timed access. Channel parameter allows
+ *             templates to be reused.
+ *
+ * COPYRIGHT (C) 2018 Z0996690
+ */
 
-clock t;</declaration>
+// Local clock used to enforce access time.
+clock t;
+
+// Timing bounds used in guard and invariant.
+const int TMIN = 25; // ns
+const int TMAX = 30; // ns</declaration>
 		<location id="id4" x="-289" y="-374">
 			<name x="-273" y="-390">ACCESSING</name>
 			<label kind="invariant" x="-273" y="-374">t &lt;= TMAX</label>
@@ -101,7 +176,102 @@ clock t;</declaration>
 	<template>
 		<name>Controller</name>
 		<parameter>bool &amp;type, urgent chan &amp;req, chan &amp;done, chan &amp;mem_req, urgent chan &amp;mem_done, broadcast chan &amp;status, urgent chan &amp;hit, urgent chan &amp;miss, urgent chan &amp;invalid, chan &amp;read, chan &amp;write, chan &amp;rewrite, chan &amp;overwrite, urgent chan &amp;line_done, broadcast chan &amp;cache_hit, broadcast chan &amp;cache_miss</parameter>
-		<declaration>clock t;</declaration>
+		<declaration>/** Controller process template
+ *
+ * DESCRIPTION
+ *  This template is used coordinate cache lines and
+ *  ensure only one cache line is written with a tag.
+ *
+ *  The template has no knowledge of the associativity
+ *  or number of cache lines. That depends on the
+ *  properties of the processes with which the
+ *  controller process shares channels with.
+ * 
+ *  The process queries the status of all cache lines
+ *  listening using a status broadcast to determine if
+ *  any cache lines have hit or are invalid. Silent
+ *  channels are either IDLE (NOTSELECTED) or MISS.
+ *  
+ *  Four main cases:
+ *    READ hit : Send read request to the only hit line.
+ *   READ miss : Send request to main memory then 
+ *               execute write miss procedure.
+ *   WRITE hit : Send rewrite request to the only hit
+ *               line.
+ *  WRITE miss : If any lines are invalid,
+ *               non-deterministically send write request
+ *               to one of the invalid lines.
+ *               Otherwise non-deterministically send
+ *               overwrite request to one of the invalid
+ *               miss lines.
+ *
+ * ARGUMENTS
+ *       type : Reference to shared variable which
+ *              indicates if an access request is a
+ *              READ (true|1) or a WRITE (false|0).
+ *        req : Reference to shared channel which the
+ *              the controller listens to for requests.
+ *              This channel is qualified as urgent to
+ *              prevent the controller from blocking after
+ *              request has been issued by the other process.
+ *       done : Reference to shared channel which the
+ *              controller uses to signal a request has been
+ *              handled.
+ *    mem_req : Reference to shared channel which the
+ *              controller uses to access main memory in the
+ *              case of a read miss or write. Channel
+ *              parameter allows the system to be easily
+ *              reconfigured and template reused.
+ *   mem_done : Reference to shared channel which the
+ *              controller listens to determine when a main
+ *              memory access has been completed. This channel
+ *              is qualified as urgent so the process cannot
+ *              block once the main memory has sent a response.
+ *     status : Reference to shared broadcast channel which
+ *              the controller uses to get all cache lines to
+ *              revaluate and signal their state: NOTSELECTED,
+ *              INVALID, HIT or MISS; depending on the address
+ *              bus and their valid state.
+ *        hit : Reference to shared channel which the
+ *              controller listens for after sending a status
+ *              signal. This channel indicates a hit on one of
+ *              the cache lines.
+ *    invalid : Reference to shared channel which the
+ *              controller listens for after sending a status
+ *              signal. This channel indicates one or more of
+ *              the cache lines are invalid.
+ *       read : Reference to shared channel which the
+ *              controller sends after receiving a hit on one
+ *              cache line during a READ type request.
+ *      write : Reference to shared channel which the
+ *              controller sends after a receiving an invalid
+ *              on one or more cache lines but no hit during a
+ *              WRITE type request to non-deterministically
+ *              write an invalid, selected cache line.
+ *    rewrite : Reference to a shared channel which the
+ *              controller sends after receiving a hit on one
+ *              cache line to access that cache line.
+ *  overwrite : Reference to a shared channel which the
+ *              controller sends after receiving no hits or
+ *              invalid signals to non-deterministically write
+ *              any selected line.
+ *  line_done : Reference to a shared channel which the
+ *              controller listens to after issuing a line
+ *              request (read|write|rewrite|overwrite). This
+ *              channel signals the request has been handled.
+ *              This channel is qualified as urgent to
+ *              prevent the controller blocking after the line
+ *              issues the request.
+ *  cache_hit : Reference to a shared broadcast channel which
+ *              the controller sends if any lines respond with
+ *              hit. Write hits are counted.
+ * cache_miss : Reference to a shared broadcast channel which
+ *              the controller sends if no lines respond with
+ *              miss. Write misses are counted.
+ *
+ * COPYRIGHT (C) 2018 Z0996690
+ */
+</declaration>
 		<location id="id6" x="-1071" y="-782">
 			<committed/>
 		</location>
@@ -282,39 +452,131 @@ clock t;</declaration>
 	<template>
 		<name>CacheLine</name>
 		<parameter>const int[0,MAX_LINE_WIDTH] LINE_WIDTH, const bool line[MAX_LINE_WIDTH], bool &amp;addr[ADDR_WIDTH], chan &amp;mem_req, urgent chan &amp;mem_res, urgent chan &amp;status, broadcast chan &amp;hit, broadcast chan &amp;miss, broadcast chan &amp;invalid, urgent chan &amp;read, urgent chan &amp;write, urgent chan &amp;rewrite, urgent chan &amp;overwrite, chan &amp;done</parameter>
-		<declaration>/* Timing bounds */
-const int TMINR = 5;
-const int TMAXR = 10;
-const int TMINW = 25;
-const int TMAXW = 30;
+		<declaration>/** CacheLine process template
+ *
+ * DESCRIPTION
+ *  This template is used to store the tags and valid
+ *  bits for each cache line. The temporal logic is
+ *  also carried out here for cache accesses.
+ *
+ *  The template does not communicate with the core
+ *  but with the controller which knows the state of
+ *  all other cache lines.
+ * 
+ *  The process listens to status queries, upon which
+ *  the process location is updated to IDLE (NOTSELECTED),
+ *  INVALID, MISS or HIT, sending the status on transition
+ *  into the location over a broadcast channel. The conditions
+ *  for these locations are as follows:
 
-/* Address breakdown */
+ *      HIT : LSBs of address bus match line[0:LINE_WIDTH-1];
+ *            Valid bit is true;
+ *            MSBs of address bus match tag[0:TAG_WIDTH-1].
+
+ *     MISS : LSBs of address bus match line[0:LINE_WIDTH-1];
+ *            Valid bit is true;
+ *            MSBs of address bus do not match tag[0:TAG_WIDTH-1].
+
+ *  INVALID : LSBs of address bus match line[0:LINE_WIDTH-1];
+ *            Valid bit is false.
+
+ *     IDLE : LSBs of address bus do not match line[0:LINE_WIDTH-1].
+ *  
+ *  The process location determined which requests
+ *  the process will respond to. These are read, rewrite,
+ *  overwrite, write. The *write requests will also write
+ *  main memory in parallel, implementing the cache write
+ *  through policy.
+ *
+ * ARGUMENTS
+ * LINE_WIDTH : Constant which indicates how many bits of line
+ *              to check in is_cache_line(). This circumvents
+ *              the compile time restriction on parameter array
+ *              length.
+ *       line : Constant which is an array of bits of which
+ *              elements [0,LINE_WIDTH-1] must match for the
+ *              cache line to be selected.
+ *       addr : Reference to a shared array of bits
+ *              which is the address bus. This avoids
+ *              the address bus being in the global
+ *              scope.
+ *    mem_req : Reference to shared channel which the
+ *              cacheline uses to access main memory in the
+ *              case of a write through to memory. Channel
+ *              parameter allows the system to be easily
+ *              reconfigured and template reused.
+ *   mem_done : Reference to shared channel which the
+ *              cacheline listens to determine when a main
+ *              memory access has been completed. This channel
+ *              is qualified as urgent so the process cannot
+ *              block once the main memory has sent a response.
+ *     status : Reference to shared channel which the line
+ *              listens before revaluating and signaling its
+ *              state. Urgency prevents process from blocking
+ *              or ignoring request.
+ *        hit : Reference to shared channel which the line
+ *              uses to signal transition into HIT.
+ *       miss : Reference to shared channel which the line
+ *              uses to signal transition into MISS.
+ *    invalid : Reference to shared channel which the line
+ *              uses to signal transition into INVALID.
+ *       read : Reference to shared channel which the line
+ *              listens to in HIT. Urgency prevents
+ *              process from blocking or ignoring request.
+ *      write : Reference to shared channel which the line
+ *              listens to in INVALID. Urgency prevents
+ *              process from blocking or ignoring request.
+ *    rewrite : Reference to shared channel which the line
+ *              listens to in HIT. Urgency prevents
+ *              process from blocking or ignoring request.
+ *  overwrite : Reference to shared channel which the line
+ *              listens to in MISS. Urgency prevents
+ *              process from blocking or ignoring request.
+ *       done : Reference to a shared channel which the
+ *              line uses to signal the completion of a request
+ *              request (read|write|rewrite|overwrite).
+ *
+ * COPYRIGHT (C) 2018 Z0996690
+ */
+
+
+// Cache timing constraints for read and write.
+const int TMINR = 5; // ns
+const int TMAXR = 10; // ns
+const int TMINW = 25; // ns
+const int TMAXW = 30; // ns
+
+// Size of line and tag.
 const int TAG_WIDTH = ADDR_WIDTH - LINE_WIDTH;
 const int LINE_OFFSET = 0;
 const int TAG_OFFSET = LINE_OFFSET + LINE_WIDTH;
 
-/* State */
+// Line state
 bool tag[TAG_WIDTH];
 bool valid = false;
 
-/* Local clock for timed cache accesses */
+// Local clock for timed cache accesses.
 clock t;
 
+// Test for IDLE|*
 bool is_cache_line()
 {
     return forall (i : int[0,LINE_WIDTH-1]) addr[i+LINE_OFFSET] == line[i];
 }
 
+// Test for INVALID|*
 bool is_cache_valid()
 {
     return valid;
 }
 
+// Test for HIT|MISS
 bool is_cache_hit()
 {
     return forall (i : int[0,TAG_WIDTH-1]) addr[i+TAG_OFFSET] == tag[i];
 }
 
+// Updates cache line on *write requests.
 void update_cache()
 {
     for (i : int[0,TAG_WIDTH-1]) tag[i] = addr[i+TAG_OFFSET];
@@ -490,18 +752,47 @@ void update_cache()
 	<template>
 		<name>Counter</name>
 		<parameter>const int MAX_REQUESTS, urgent chan &amp;hit, urgent chan &amp;miss</parameter>
-		<declaration>int[0,MAX_REQUESTS] num_misses = 0;
+		<declaration>/** Counter process template
+ *
+ * DESCRIPTION
+ *  This template is used to count the number of
+ *  hits and misses and compare hit rates.
+ *  It is a test automaton.
+ * 
+ *  To avoid inflating the state space, the
+ *  automaton will only count a finite number of
+ *  requests.
+ * 
+ * ARGUMENTS
+ *  MAX_REQUESTS : Constant maximum number of requests to
+ *                 count. This should be as small as possible
+ *                 to avoid inflating the state space.
+ *           hit : Reference to shared channel indicating a
+ *                 cache hit. Urgency ensures all hits are
+ *                 counted.
+ *          miss : Reference to shared channel indicating a
+ *                 cache miss. Urgency ensure all misses are
+ *                 counted.
+ *                 
+ *
+ * COPYRIGHT (C) 2018 Z0996690
+ */
+
+// Bound variables.
+int[0,MAX_REQUESTS] num_misses = 0;
 int[0,MAX_REQUESTS] num_hits = 0;
 
+// Total number of misses and hits.
 int num_requests()
 {
     return num_misses + num_hits;
 }
 
+// Method to evaulate whether a hit rate had been exceeded.
 bool hit_rate_ge(const int test)
 {
     return num_requests() &gt; 0
-        &amp;&amp; 100*num_hits &gt;= test*num_requests();
+       and 100*num_hits &gt;= test*num_requests();
 }</declaration>
 		<location id="id35" x="-671" y="-178">
 			<name x="-654" y="-187">END</name>
@@ -544,22 +835,23 @@ bool hit_rate_ge(const int test)
  * COPYRIGHT (c) 2018 Z0996690
  */
 
-/* Address bus */
+// Address bus
 bool addr[ADDR_WIDTH];
 bool type;
 
-/* Line identifiers */
+// Line identifiers
 const int NUM_LINES = 2;
 const bool LINE_ID[NUM_LINES][MAX_LINE_WIDTH] = {{0}, {1}};
 
-/* Separate core and memory channels */
+// Separate core and memory channels to allow
+// intermediate cache processes.
 chan core_request;
 chan core_response;
 
 chan mem_request;
 chan mem_response;
 
-/* Cache channels */
+// Cache channels
 broadcast chan cache_hit;
 broadcast chan cache_miss;
 
@@ -574,7 +866,8 @@ chan line_rewrite;
 chan line_overwrite;
 chan line_done;
 
-/* Parameterised cache line process */
+// Parameterised cache processes allow associativity
+// and number of lines to be specified.
 CacheLines(const int line, const int num_lines, const int num_sets) = CacheLine(
     CEIL_LOG2[num_lines/num_sets],
     LINE_ID[line],
@@ -592,11 +885,11 @@ CacheLines(const int line, const int num_lines, const int num_sets) = CacheLine(
     line_done
 ); 
 
-/* Core and memory processes */
+// Core and memory processes
 core = Core(addr, type, core_request, core_response);
 memory = Memory(mem_request, mem_response);
 
-/* Direct mapped cache, two lines, one-way set associativity */
+// Direct mapped cache, two lines, one-way set associativity
 dmc_controller = Controller(
     type,
     core_request,
